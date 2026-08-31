@@ -5,6 +5,11 @@ where the two disagree, the plan wins.
 
 Machine of record: Apple M3, 24 GB unified memory, macOS 26.6.2, ffmpeg 8.1.1.
 
+**Executed 2026-08-31. All milestones complete; every binary gate passed and no
+runtime source changed.** Evidence: `reports/0.1.4-apple-silicon-validation.md`
+and `reports/apple-silicon-corpus-manifest.{json,md}`. M9 recorded BF16 as a
+measured limitation rather than a documentable flag, so T7.8 did not fire.
+
 **Default outcome is zero runtime source changes.** Tasks that edit runtime code
 exist only as contingencies, gated on a recorded failure. Do not "fix" anything
 in M2–M6 on sight — record it.
@@ -33,28 +38,28 @@ M4 exists. M9 is optional and never blocks release.
 No hardware work. Ends with everything downstream measurable against something
 written down.
 
-- [ ] **T1.1** Write the supported boundary: Apple Silicon, macOS 14 or newer.
+- [x] **T1.1** Write the supported boundary: Apple Silicon, macOS 14 or newer.
       Record the two reasons (PyTorch 2.11 MPS floor, TorchCodec
       `macosx_14_0_arm64` wheel target). Intel Macs excluded.
-- [ ] **T1.2** Adopt the memory qualifier verbatim: *validated on M3 with 24 GB
+- [x] **T1.2** Adopt the memory qualifier verbatim: *validated on M3 with 24 GB
       unified memory; lower-memory and other M-series systems are compatibility
       targets, not release-tested.*
-- [ ] **T1.3** Freeze the binary gate list (doctor, pytest, clean-wheel, both
+- [x] **T1.3** Freeze the binary gate list (doctor, pytest, clean-wheel, both
       audio backends, `--alignment word`, output locks, CLI/API parity, model
       lifecycle). Any failure blocks support.
-- [ ] **T1.4** Write the CLI/API parity criterion precisely: identical text and
+- [x] **T1.4** Write the CLI/API parity criterion precisely: identical text and
       segment/word/cue timestamps, matching resolved configuration, matching
       model provenance. Wall-clock timings are measured, never compared for
       equality.
-- [ ] **T1.5** Assemble the local Arabic + English reference subset and write its
+- [x] **T1.5** Assemble the local Arabic + English reference subset and write its
       manifest to `reports/` — dataset IDs, per-file hashes, decoded durations.
-- [ ] **T1.6** Record the evidence limitation in the report template: the balanced
+- [x] **T1.6** Record the evidence limitation in the report template: the balanced
       500-file baseline is not reproducible from this repo
       (`docs/performance.md:48` names datasets, not the selection). The substitute
       is self-consistency against CPU FP32. **No parity with the released CUDA
       baseline may be claimed.**
-- [ ] **T1.7** Fix the measurement protocol: medians over repeated alternating
-      runs, per `development.md:148`. A single run proves completion only.
+- [x] **T1.7** Fix the measurement protocol: medians over repeated alternating
+      runs, per `development.md:167`. A single run proves completion only.
 
 **Risk:** T1.5 is the one task that can silently expand. Timebox it — a small
 fixed subset that is hashed and reproducible beats a large one that is not.
@@ -66,16 +71,16 @@ fixed subset that is hashed and reproducible beats a large one that is not.
 System Python is 3.14.6 and there is no `python` on PATH; `requires-python` is
 `>=3.10,<3.14`. Use the pinned 3.12.
 
-- [ ] **T2.1** `uv venv --python 3.12`
-- [ ] **T2.2** `uv sync --locked --group dev --extra word --extra onnx --extra auditok`.
+- [x] **T2.1** `uv venv --python 3.12`
+- [x] **T2.2** `uv sync --locked --group dev --extra word --extra onnx --extra auditok`.
       `quantized` deliberately omitted (bitsandbytes is CUDA-gated at
       `preflight.py:58` and `asr/model.py:130`); `adapters` omitted unless an
       adapter is under test.
-- [ ] **T2.3** `uv run --no-sync cohere-transcribe-doctor` → must report
+- [x] **T2.3** `uv run --no-sync cohere-transcribe-doctor` → must report
       `accelerator: Apple MPS`. **Binary gate.**
-- [ ] **T2.4** `uv run --no-sync cohere-transcribe-doctor --mode word`
-- [ ] **T2.5** `uv run --no-sync pytest` — full suite on 3.12. **Binary gate.**
-- [ ] **T2.6** Record every failure as a platform fact. Do not patch source here.
+- [x] **T2.4** `uv run --no-sync cohere-transcribe-doctor --mode word`
+- [x] **T2.5** `uv run --no-sync pytest` — full suite on 3.12. **Binary gate.**
+- [x] **T2.6** Record every failure as a platform fact. Do not patch source here.
 
 Every `uv run` in this project uses `--no-sync` (`docs/development.md:28`) so an
 implicit sync cannot replace the device-specific Torch build.
@@ -85,18 +90,18 @@ implicit sync cannot replace the device-specific Torch build.
 ## M3 — Admissible build artifact
 
 Runs **before** any measurement. Measuring from the source checkout produces
-evidence that must be discarded and repeated (`development.md:148`).
+evidence that must be discarded and repeated (`development.md:167`).
 
-- [ ] **T3.1** Follow `docs/development.md:120` with two documented adaptations:
+- [x] **T3.1** Follow `docs/development.md:126-136` with two documented adaptations:
       - create the test venv with the Step 2 interpreter —
         `".venv/bin/python" -m venv "$WHEEL_TEST/venv"` — because there is no
         `python` on PATH and `python3` is the unsupported 3.14.6;
       - **postpone `rm -rf "$WHEEL_TEST"`** until M6 finishes, or it deletes the
         only installed wheel M5 and M6 depend on.
-- [ ] **T3.2** Build the wheel and install it into the clean venv.
-- [ ] **T3.3** `scripts/smoke_clean_audio.py` passes. **Binary gate.**
-- [ ] **T3.4** `scripts/smoke_public_api.py` passes. **Binary gate.**
-- [ ] **T3.5** Confirm every M5/M6 command targets this installed wheel, not the
+- [x] **T3.2** Build the wheel and install it into the clean venv.
+- [x] **T3.3** `scripts/smoke_clean_audio.py` passes. **Binary gate.**
+- [x] **T3.4** `scripts/smoke_public_api.py` passes. **Binary gate.**
+- [x] **T3.5** Confirm every M5/M6 command targets this installed wheel, not the
       checkout.
 
 ---
@@ -105,20 +110,20 @@ evidence that must be discarded and repeated (`development.md:148`).
 
 Minutes, no model download. Cheap enough to run before anything expensive.
 
-- [ ] **T4.1** Write a standalone probe script comparing BF16 and FP16 against
+- [x] **T4.1** Write a standalone probe script comparing BF16 and FP16 against
       FP32 on MPS for the operations the model actually uses: large matmul,
       `scaled_dot_product_attention`, softmax, layernorm. Report max absolute and
       relative error.
-- [ ] **T4.2** Run it **paired**: once with `PYTORCH_ENABLE_MPS_FALLBACK=0`, once
+- [x] **T4.2** Run it **paired**: once with `PYTORCH_ENABLE_MPS_FALLBACK=0`, once
       with `1`. At `0` a missing MPS kernel raises instead of silently relocating
       to CPU; at `1` it matches shipped behavior. **A difference between the two
       runs is itself the finding** — record it.
-- [ ] **T4.3** Scope the `=0` override to the probe process only.
+- [x] **T4.3** Scope the `=0` override to the probe process only.
       `_environment.py:10` uses `setdefault`, so a caller-set `0` propagates into
       the runtime and M5/M6/M9 would measure a configuration we do not ship.
-- [ ] **T4.4** Record results. The probe can only **veto** a dtype, never approve
+- [x] **T4.4** Record results. The probe can only **veto** a dtype, never approve
       one. It must not be promoted into the `auto` decision, and the existing
-      single-allocation check (`engine.py:100`) stays where it is, guarding
+      single-allocation check (`runtime/engine.py:100`) stays where it is, guarding
       explicit `--dtype bf16`.
 
 ---
@@ -128,22 +133,22 @@ Minutes, no model download. Cheap enough to run before anything expensive.
 `auto` cannot change on this evidence, so this milestone validates the shipped
 path rather than adjudicating a dtype.
 
-- [ ] **T5.1** Run `--device cpu --dtype fp32` **once per reference file**. It is
+- [x] **T5.1** Run `--device cpu --dtype fp32` **once per reference file**. It is
       a numerical reference, not a performance arm — the repo already treats FP32
       that way for alignment (`docs/performance.md:320`).
-- [ ] **T5.2** Run `--device mps --dtype fp16` fully — this is the shipped `auto`
+- [x] **T5.2** Run `--device mps --dtype fp16` fully — this is the shipped `auto`
       behavior — on the fixed Arabic and English subset, installed wheel, shipped
       environment defaults.
-- [ ] **T5.3** Record for the MPS arm: transcript divergence vs CPU FP32, WER/CER
+- [x] **T5.3** Record for the MPS arm: transcript divergence vs CPU FP32, WER/CER
       where references exist, wall-time median, process RSS, and every failure,
       NaN, empty segment, OOM retry, and repetition-guard trip.
-- [ ] **T5.4** Evaluate the pass condition: MPS FP16 completes cleanly and its
+- [x] **T5.4** Evaluate the pass condition: MPS FP16 completes cleanly and its
       divergence from CPU FP32 is explainable as precision, not corruption.
       NaNs, empty segments, or systematic divergence **block support** and reopen
       the runtime-change path.
-- [ ] **T5.5** Record the `auto` decision explicitly: `engine.py:81` stays FP16.
+- [x] **T5.5** Record the `auto` decision explicitly: `runtime/engine.py:83` stays FP16.
       BF16 is emulated through FP32 on earlier M-series parts, so an M3 BF16 win
-      can be an M1/M2 regression. `engine.py:81` and `tests/test_cli.py:220` are
+      can be an M1/M2 regression. `runtime/engine.py:83` and `tests/test_cli.py:220` are
       untouched. **This is the expected result, not a disappointment.**
 
 ---
@@ -153,12 +158,12 @@ path rather than adjudicating a dtype.
 Each item is a Linux assumption, probably fine on macOS, untested. Confirm by
 running the installed wheel at shipped defaults — **not by reading source**.
 
-- [ ] **T6.1 Word alignment on device.** A real `--alignment word` transcription
+- [x] **T6.1 Word alignment on device.** A real `--alignment word` transcription
       on MPS. `preflight_forced_align` (`preflight.py:18`) proves nothing about
       this path — the real aligner is `Wav2Vec2ForCTC` with sdpa moved onto the
       device (`alignment/runtime.py:30-48`). `--align-dtype fp16` is CUDA-gated
-      (`engine.py:102`), so MMS runs FP32 here. **Binary gate.**
-- [ ] **T6.2 Output locks — fail-fast, not serialization.** The lock is
+      (`runtime/engine.py:108-111`), so MMS runs FP32 here. **Binary gate.**
+- [x] **T6.2 Output locks — fail-fast, not serialization.** The lock is
       `LOCK_EX | LOCK_NB` (`locking.py:147`) and the lease is per output *stem*
       (`locking.py:39`). Four sub-checks, **binary gate**:
       1. While A holds the lock, B on the **same stem** fails immediately with
@@ -168,22 +173,22 @@ running the installed wheel at shipped defaults — **not by reading source**.
          contender must never pay a 2B model load to discover contention.
       3. After A releases, a fresh B succeeds.
       4. Two processes on **different stems** in one directory both succeed.
-- [ ] **T6.3 Lock directory on macOS.** `state/locking.py:52` hardcodes `/tmp`
+- [x] **T6.3 Lock directory on macOS.** `state/locking.py:53` hardcodes `/tmp`
       (a symlink to `/private/tmp`); `_validate_lock_directory` (`:63-80`)
       requires uid ownership at mode 0700. macOS prunes `/tmp` periodically —
       confirm recreation works. Expected and fine.
-- [ ] **T6.4 TorchCodec vs Homebrew ffmpeg 8.1.1.** `--audio-backend torchcodec`
+- [x] **T6.4 TorchCodec vs Homebrew ffmpeg 8.1.1.** `--audio-backend torchcodec`
       decodes; `--audio-backend ffmpeg` decodes; `auto` resolves to TorchCodec
       (`audio/backends.py:32`) rather than silently falling through to the
       subprocess (`:56`). Confirm per-file FFmpeg recovery. **Binary gate.**
-- [ ] **T6.5 `PYTORCH_ALLOC_CONF=expandable_segments:True`** (`_environment.py:16`)
+- [x] **T6.5 `PYTORCH_ALLOC_CONF=expandable_segments:True`** (`_environment.py:16`)
       is a CUDA allocator key. Confirm the MPS allocator ignores it without
       warning or raising. If it complains, set it only when CUDA is present —
       this is the one contingent runtime edit in the plan.
-- [ ] **T6.6 CLI/API parity**, per T1.4. **Binary gate.**
-- [ ] **T6.7 Reusable-model lifecycle:** one-shot cleanup, segment/text ASR
+- [x] **T6.6 CLI/API parity**, per T1.4. **Binary gate.**
+- [x] **T6.7 Reusable-model lifecycle:** one-shot cleanup, segment/text ASR
       retention, word-mode ASR eviction, post-alignment reload. **Binary gate.**
-- [ ] **T6.8** Only after all of the above: `rm -rf "$WHEEL_TEST"`.
+- [x] **T6.8** Only after all of the above: `rm -rf "$WHEEL_TEST"`.
 
 ---
 
@@ -192,18 +197,18 @@ running the installed wheel at shipped defaults — **not by reading source**.
 Only failures and measurements authorize edits. On the evidence this plan
 produces, expect **no runtime source change**.
 
-- [ ] **T7.1** `pyproject.toml:28` — add `Operating System :: MacOS :: MacOS X`.
-- [ ] **T7.2** `README.md:9`, `docs/usage.md:7`, `docs/development.md:7` — Apple
+- [x] **T7.1** `pyproject.toml:28` — add `Operating System :: MacOS :: MacOS X`.
+- [x] **T7.2** `README.md:9`, `docs/usage.md:7`, `docs/development.md:7` — Apple
       Silicon, macOS 14+, with the M3/24 GB qualifier from T1.2.
-- [ ] **T7.3** `docs/architecture.md:201`, `docs/usage.md:530` — replace
+- [x] **T7.3** `docs/architecture.md:201`, `docs/usage.md:530` — replace
       "unvalidated" with the measured result and its scope.
-- [ ] **T7.4** `docs/development.md:120` — record the two M3 adaptations so the
+- [x] **T7.4** `docs/development.md:126-136` — record the two M3 adaptations so the
       next person on macOS does not rediscover them.
-- [ ] **T7.5** `docs/performance.md` — M3 numbers in a **separate** table from the
+- [x] **T7.5** `docs/performance.md` — M3 numbers in a **separate** table from the
       RTX 3060 baselines, carrying the self-consistency caveat from T1.6.
-- [ ] **T7.6** `CHANGELOG.md` — one entry.
-- [ ] **T7.7** `reports/` — versioned evidence file plus the T1.5 corpus manifest.
-- [ ] **T7.8** *(conditional on M9 passing)* `docs/usage.md:541` — document
+- [x] **T7.6** `CHANGELOG.md` — one entry.
+- [x] **T7.7** `reports/` — versioned evidence file plus the T1.5 corpus manifest.
+- [~] **T7.8** *(did not fire; M9 failed criterion 3, so the flag stays undocumented)* `docs/usage.md:541` — document
       `--dtype bf16` as an M3-validated explicit option, with the emulation
       caveat. State that `auto` remains FP16 and why.
 
@@ -211,14 +216,14 @@ produces, expect **no runtime source change**.
 
 ## M8 — CI, scoped honestly
 
-- [ ] **T8.1** Add a `macos-latest` job to `.github/workflows/ci.yml:47`.
-- [ ] **T8.2** Scope it to installation, the unit suite,
+- [x] **T8.1** Add a `macos-latest` job to `.github/workflows/ci.yml:47`.
+- [x] **T8.2** Scope it to installation, the unit suite,
       `cohere-transcribe-doctor`, and the M4 kernel probe.
-- [ ] **T8.3** State in the workflow **and** the docs that this is not model
+- [x] **T8.3** State in the workflow **and** the docs that this is not model
       validation — the runner is M1-class with ~7 GB RAM and cannot host the
       gated 2B model. Full-model evidence stays manual on the M3. Without this, a
       green check will eventually be misread as end-to-end validation.
-- [ ] **T8.4** Note that the runner is the generation where BF16 is emulated: the
+- [x] **T8.4** Note that the runner is the generation where BF16 is emulated: the
       right place to watch for the emulation signature in the probe, the wrong
       place to conclude anything about M3 throughput.
 
@@ -229,17 +234,17 @@ produces, expect **no runtime source change**.
 Not required for support. Run it only to decide whether `--dtype bf16` gets
 documented.
 
-- [ ] **T9.1** Add a `--device mps --dtype bf16` arm; five alternating runs
+- [x] **T9.1** Add a `--device mps --dtype bf16` arm; five alternating runs
       against FP16; report medians.
-- [ ] **T9.2** Evaluate all three criteria — document the flag only if BF16
+- [x] **T9.2** Evaluate all three criteria — document the flag only if BF16
       median wall time is ≤ 110% of the FP16 median, **and** BF16 produces no
       NaN, empty segment, or repetition-guard trip that FP16 does not also
       produce, **and** no CER divergence from CPU FP32 exceeding 0.5 percentage
       points above FP16's.
-- [ ] **T9.3** If BF16 misses any bar, record it as a **measured limitation of
+- [x] **T9.3** If BF16 misses any bar, record it as a **measured limitation of
       BF16 on this platform** — a documentable finding about the flag, not an
       absence of difference — and leave the flag undocumented.
-- [ ] **T9.4** If documented, ship the caveat: the guard at `engine.py:99-107`
+- [~] **T9.4** *(not applicable; the flag is not documented)* If documented, ship the caveat: the guard at `runtime/engine.py:100-107`
       allocates one BF16 tensor, so on a machine where BF16 is emulated the
       allocation succeeds, the flag is accepted, and it then runs slowly. The
       guard detects absence of support, not emulation. Documenting without saying

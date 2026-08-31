@@ -4,7 +4,7 @@ This guide covers installation, transcription modes, batch processing, recovery,
 
 ## Install
 
-The supported release environment is Linux with Python 3.10 through 3.13. A CUDA GPU is strongly recommended. A CPU code path is implemented, but full-model CPU inference was not validated for this release and is unlikely to be practical for high-throughput work.
+The supported release environments are Linux and Apple Silicon macOS 14 or newer, with Python 3.10 through 3.13; the macOS path was validated on Python 3.12. macOS 14 is the floor because PyTorch 2.11 requires it for MPS and the TorchCodec wheel targets `macosx_14_0_arm64`; Intel Macs have no MPS and are out of scope. Apple Silicon is validated on M3 with 24 GB unified memory; lower-memory and other M-series systems are compatibility targets, not release-tested. That validation ran on Python 3.12 against a local 8-clip corpus and the ungated mirror of the model rather than the gated default checkpoint; `docs/performance.md` states the limits. A CUDA GPU is strongly recommended. A CPU code path is implemented, but full-model CPU inference was not validated for this release and is unlikely to be practical for high-throughput work.
 
 Create a virtual environment and install the package:
 
@@ -527,7 +527,7 @@ cohere-transcribe recordings/ --batch-size 24 --vad-merge
 | NVIDIA RTX 3060 12 GB | BF16, static batch 24 is the measured configuration |
 | Other CUDA GPUs | Not benchmarked by this project; start with automatic precision and lower `--batch-size` after OOM or when device headroom is small |
 | CPU | FP32 code path; full 2B-model execution was not validated for this release |
-| Apple MPS | FP16 path is implemented but was not run on physical MPS hardware for this release |
+| Apple MPS | FP16, static batch 8; validated on an M3 with 24 GB unified memory against a local 8-clip corpus and the ungated model mirror, not the balanced corpus or the gated default checkpoint. See `docs/performance.md`. Other M-series parts and lower-memory machines are compatibility targets, not release-tested |
 | AMD ROCm | Experimental through PyTorch's CUDA-compatible interface; not validated for this release |
 
 Adaptive growth is available through `--adaptive-batch`, with an optional `--batch-max-size`, but it is not the validated default. Pinned host transfers are also opt-in through `--pin-memory` because the extra copy did not improve the reference GPU.

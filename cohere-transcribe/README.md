@@ -6,10 +6,13 @@ The default CohereLabs ASR weights are downloaded from a pinned Hugging Face rev
 
 ## Requirements
 
-- Linux with Python 3.10 through 3.13.
+- Linux, or Apple Silicon macOS 14 or newer, with Python 3.10 through 3.13. The macOS path was validated on Python 3.12.
+  Apple Silicon is validated on M3 with 24 GB unified memory; lower-memory and other M-series systems are compatibility targets, not release-tested. Intel Macs are out of scope.
 - Access to [CohereLabs/cohere-transcribe-arabic-07-2026](https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026) when using the default model; a public custom checkpoint does not require access to the default repository.
 - System FFmpeg libraries for TorchCodec. Installing the `ffmpeg` OS package also provides the command-line fallback used when TorchCodec is unavailable or rejects a file.
-- A CUDA GPU is strongly recommended for the 2B model. A CPU code path exists, but full-model CPU inference was not validated for this release.
+- A CUDA GPU is strongly recommended for the 2B model. The Apple MPS FP16 path is
+  validated on hardware for this release; see `docs/performance.md` for its scope.
+  A CPU code path exists, but full-model CPU inference was not validated for this release.
 
 On Ubuntu or Debian:
 

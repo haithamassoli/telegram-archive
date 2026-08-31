@@ -4,7 +4,8 @@ This guide covers source setup, tests, dependency rules, public API maintenance,
 
 ## Prerequisites
 
-- Linux with Python 3.10 through 3.13.
+- Linux, or Apple Silicon macOS 14 or newer, with Python 3.10 through 3.13.
+  See Clean-Wheel Validation for the three macOS adaptations to the build sequence.
 - [uv](https://docs.astral.sh/uv/).
 - System FFmpeg libraries and executables.
 - A CUDA GPU and gated model access only for manual inference and performance validation.
@@ -144,6 +145,24 @@ WHEEL="$(realpath dist/*.whl)"
 "$WHEEL_TEST/venv/bin/cohere-transcribe-doctor" --mode word --audio-backend librosa
 rm -rf "$WHEEL_TEST"
 ```
+
+On Apple Silicon the sequence needs three adaptations:
+
+- `python -m venv` has no interpreter to use. There is no `python` on a stock
+  macOS PATH and `python3` is outside `requires-python`, so create the test
+  environment with the pinned 3.12 from `.python-version`:
+  `".venv/bin/python" -m venv "$WHEEL_TEST/venv"`.
+- `rm -rf "$WHEEL_TEST"` deletes the only installed wheel. Postpone it until
+  every installed-wheel measurement has finished.
+- The two blocks are order-critical. `scripts/smoke_clean_audio.py` fails if
+  `auditok`, `onnxruntime`, `silero_vad`, `torchaudio`, or `uroman` is
+  importable, and the extras block installs all of them, so the smoke script
+  passes only before the extras install and can never be re-run in that
+  environment afterwards.
+
+`bitsandbytes` installs and imports on macOS arm64 even though it carries no
+MPS kernels, so the extras block passes there; quantized checkpoints stay
+CUDA-gated at `preflight.py:58` and `asr/model.py:130`.
 
 ## Runtime and Performance Validation
 

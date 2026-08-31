@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Validate the Apple Silicon MPS device path on hardware and declare it supported on macOS 14 or newer, validated on an M3 with 24 GB unified memory; lower-memory and other M-series systems are compatibility targets, not release-tested. No runtime source changed: MPS FP16 output matched CPU FP32 byte for byte on the local validation corpus, `--dtype auto` stays FP16 on MPS, and `PYTORCH_ALLOC_CONF` is inert rather than hostile off CUDA. The measurements used the third-party ungated mirror `evewashere/cohere-transcribe-03-2026-ungated` rather than the gated default checkpoint, and an 8-clip local corpus rather than the balanced 500-file baseline; see `reports/0.1.4-apple-silicon-validation.md` for the full limits.
+- Add `scripts/mps_kernel_probe.py`, a standalone fail-fast probe comparing BF16 and FP16 against FP32 on MPS for matmul, scaled dot-product attention, softmax, and layer norm. It can veto a precision, never approve one, and reports the BF16-emulation timing signature.
+- Add `scripts/build_validation_corpus.py` and a hashed manifest under `reports/` for the local Arabic and English reference subset, which substitutes for the balanced 500-file baseline whose file selection this repository does not store.
+- Add a `macos-latest` CI job covering installation, the unit suite, the doctor, and the kernel probe. It is explicitly not model validation: the runner cannot host the 2B model.
+
 ## 0.1.4 - 2026-07-15
 
 - Declare the package's Apache-2.0, CC-BY-NC-4.0, and MIT license scopes with PEP 639 metadata, complete license texts, source provenance, and notices included in both distribution formats.

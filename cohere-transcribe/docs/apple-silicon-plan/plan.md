@@ -77,7 +77,7 @@ Test, using the **same stem** in both processes:
 ### Measured criteria
 
 Wall time and process RSS as medians over repeated alternating runs. A single run
-proves completion and must not support a speed claim (`development.md:148`).
+proves completion and must not support a speed claim (`development.md:167`).
 
 ### Known evidence limitation — state this in the report
 
@@ -85,7 +85,7 @@ The balanced 500-file baseline is **not reproducible from this repository**.
 `docs/performance.md:48` names the five source datasets (Casablanca, Common Voice
 18 Arabic, FLEURS `ar_eg`, a Quran Classical Arabic proxy, SADA22) but the
 specific file selection is not stored here. Retained-transcript comparison, which
-`development.md:148` requires, is unavailable.
+`development.md:167` requires, is unavailable.
 
 The substitute is **self-consistency**: MPS output compared against CPU FP32
 output over a locally assembled fixed subset. That demonstrates implementation
@@ -94,7 +94,7 @@ baseline, and no such parity may be claimed.
 
 Record the local subset as a manifest under `reports/` — dataset IDs, per-file
 hashes, decoded durations — so the corpus is reproducible even though the
-original selection is not. `development.md:148` already designates `reports/` for
+original selection is not. `development.md:167` already designates `reports/` for
 release evidence.
 
 ## Step 2 — Install and run the existing suite
@@ -123,11 +123,11 @@ Failures here are platform facts to record, not things to fix on sight.
 
 ## Step 3 — Build and install the wheel
 
-Before any measurement, not after. `development.md:148` requires installed-wheel
+Before any measurement, not after. `development.md:167` requires installed-wheel
 execution, so measuring from the source checkout produces evidence that must be
 discarded and repeated.
 
-The sequence at `docs/development.md:120` **cannot run verbatim on this machine**.
+The sequence at `docs/development.md:126-136` **cannot run verbatim on this machine**.
 Two adaptations:
 
 - It calls bare `python -m venv`. There is no `python` here, and `python3` is the
@@ -159,7 +159,7 @@ Steps 4b, 4d, and 5 run at the shipped default, or they measure a configuration
 we do not ship.
 
 This probe can only **veto** a dtype, never approve one. The existing
-single-allocation check (`engine.py:100`) is not this: it proves BF16 tensors can
+single-allocation check (`runtime/engine.py:100`) is not this: it proves BF16 tensors can
 be allocated and nothing more, which is why it stays where it is, guarding
 explicit `--dtype bf16`, and is never promoted into the `auto` decision.
 
@@ -188,13 +188,13 @@ divergence block support and reopen the runtime-change path.
 
 ### 4c. Why `auto` does not change
 
-`auto` (`engine.py:81`) stays FP16 regardless of how well BF16 performs on this
+`auto` (`runtime/engine.py:83`) stays FP16 regardless of how well BF16 performs on this
 machine. BF16 is emulated through FP32 on earlier M-series parts, so an M3 BF16
 win can be a serious regression on M1 and M2. A default that dispatches on
 hardware nobody measured is not a measured default. Changing `auto` requires BF16
 measurements across M-series generations — out of scope for this release.
 
-`engine.py:81` and `tests/test_cli.py:220` are therefore untouched, and Step 6 has
+`runtime/engine.py:83` and `tests/test_cli.py:220` are therefore untouched, and Step 6 has
 **no runtime edit available to it** unless Step 4b or Step 5 fails. That is the
 expected result, not a disappointment.
 
@@ -214,7 +214,7 @@ platform** — a documentable finding about the flag, not an absence of differen
 Record it and leave the flag undocumented.
 
 **If `--dtype bf16` is documented, it carries a caveat.** The guard at
-`engine.py:99-107` allocates one BF16 tensor; on a machine where BF16 is
+`runtime/engine.py:100-107` allocates one BF16 tensor; on a machine where BF16 is
 emulated, that allocation succeeds and the flag is accepted, then runs slowly.
 The guard detects absence of support, not emulation. Documenting the flag without
 saying so ships a footgun.
@@ -231,8 +231,8 @@ source.
   selected device (`alignment/runtime.py:30-48`), producing emissions on MPS that
   round-trip to CPU for `forced_align`. A real `--alignment word` run is
   required; the preflight proves nothing about this path. `--align-dtype fp16` is
-  CUDA-gated (`engine.py:102`), so MMS runs FP32 here.
-- **Output locks.** Per the Step 1 criterion. `state/locking.py:52` hardcodes
+  CUDA-gated (`runtime/engine.py:108-111`), so MMS runs FP32 here.
+- **Output locks.** Per the Step 1 criterion. `state/locking.py:53` hardcodes
   `/tmp` (a symlink to `/private/tmp` on macOS) and `_validate_lock_directory`
   (`:63-80`) rejects it unless owned by the uid at mode 0700. macOS periodically
   prunes `/tmp`; recreation is expected and fine.
@@ -262,7 +262,7 @@ produce, expect:
     `--dtype bf16` as an
     M3-validated explicit option, with the emulation caveat. State that `auto`
     remains FP16 and why.
-  - `docs/development.md:120` — record the two Step 3 adaptations so the next
+  - `docs/development.md:126-136` — record the two Step 3 adaptations so the next
     person on macOS does not rediscover them.
   - `docs/performance.md` — M3 numbers in a **separate** table from the RTX 3060
     baselines, carrying the self-consistency caveat.

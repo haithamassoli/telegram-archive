@@ -66,3 +66,42 @@ jobs:
           uv pip install --editable '.[auditok,onnx,word]' --group dev --torch-backend=cpu
       - name: Run tests
         run: uv run --no-sync pytest
+
+  macos:
+    # Smoke only: installation, unit suite, doctor, and the MPS kernel probe.
+    # This job is NOT model validation. The GitHub macOS runner is M1-class with
+    # ~7 GB RAM and cannot host the gated 2B model. Full-model evidence stays
+    # manual on an M3 (24 GB); a green check here says nothing about end-to-end
+    # transcription.
+    # M1-class is also the generation where BF16 is emulated: this is the right
+    # place to watch the probe for the emulation signature, and the wrong place
+    # to conclude anything about M3 throughput.
+    name: macOS smoke
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install FFmpeg
+        run: brew install ffmpeg
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          version: "0.11.28"
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install test environment
+        run: uv sync --locked --group dev --extra word --extra onnx --extra auditok
+      - name: Run tests
+        run: uv run --no-sync pytest
+      - name: Run doctor
+        run: uv run --no-sync cohere-transcribe-doctor
+      # Paired, per plan step 4a: at 0 a missing MPS kernel raises instead of
+      # silently relocating to CPU; at 1 it matches shipped behaviour, and only
+      # then does a raised kernel veto. A difference between the two runs is the
+      # finding. Unset would leave the veto dead.
+      - name: Probe MPS kernels (no CPU fallback)
+        env:
+          PYTORCH_ENABLE_MPS_FALLBACK: "0"
+        run: uv run --no-sync python scripts/mps_kernel_probe.py
+      - name: Probe MPS kernels (shipped fallback)
+        env:
+          PYTORCH_ENABLE_MPS_FALLBACK: "1"
+        run: uv run --no-sync python scripts/mps_kernel_probe.py

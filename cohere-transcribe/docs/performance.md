@@ -32,7 +32,7 @@ FFmpeg: 6.1.1
 ASR model: CohereLabs/cohere-transcribe-arabic-07-2026
 ```
 
-CPU selection and dependency handling are tested, but full-model CPU inference and throughput are not validated here. The throughput numbers on this page are not portable performance claims for CPU, Apple MPS, ROCm, Windows, other CUDA cards, or multiple GPUs.
+CPU selection and dependency handling are tested, but full-model CPU inference and throughput are not validated here. The throughput numbers on this page are not portable performance claims for CPU, ROCm, Windows, other CUDA cards, or multiple GPUs. Apple MPS has its own measured section below, on a different host and corpus, and its numbers are not comparable to the CUDA baselines.
 
 ## v0.1.0 Installed-Wheel Baselines
 
@@ -50,6 +50,67 @@ The balanced corpus contains 100 files each from Casablanca, Common Voice 18 Ara
 A rebuilt v0.1.0 wheel completed later regression smokes in 32.42 seconds for the long-form workload and 38.52 seconds for the balanced 500. Output hashes, all 500 transcripts, processor-row counts, generation-batch counts, and generated-token counts matched the retained baselines. These are single observations; the repeated medians above remain the performance baselines.
 
 After adding custom dense, saved bitsandbytes, and adapter model selection, the unchanged default-model source path completed the same 500-file package workload in 39.16 seconds externally and 38.153 seconds internally. All 500 TXT files were byte-identical to the retained release output, with the same 729 processor rows, 33 generation batches, 21,587 output tokens, and 6.05 GiB peak CUDA allocation. This single regression observation matches the 39.27-second release median and shows no default-path performance or transcript regression; it does not replace the installed-wheel baseline.
+
+## Apple Silicon (MPS)
+
+These numbers are **not comparable** to the RTX 3060 baselines above and are kept
+in a separate table for that reason. Different host, different corpus, different
+checkpoint.
+
+Host: Apple M3, 24 GB unified memory, macOS 26.6.2, Python 3.12.13, torch 2.11.0,
+torchaudio 2.11.0, TorchCodec 0.14.0, Transformers 5.13.1, FFmpeg 8.1.1
+(Homebrew). Validated on M3 with 24 GB unified memory; lower-memory and other
+M-series systems are compatibility targets, not release-tested.
+
+| Workload | Configuration | Median | RTFx | Peak process RSS |
+|---|---|---:|---:|---:|
+| Local validation corpus, 78.16 decoded seconds | MPS, FP16, TorchCodec, packed CPU PyTorch Silero, segment timing, batch 8 | 21.26s over 5 runs | 3.68x | 8.30 GiB |
+| Same corpus | CPU, FP32, otherwise identical | 41.94s, single run | — | 11.17 GiB |
+
+The CPU FP32 row is a **single measurement, not a median**. It is the numerical
+reference for the precision comparison, not a performance arm, so the ~1.97x
+ratio is an indication only.
+
+MPS FP16 output was **byte-identical to CPU FP32 on all 8 files**, with a
+cross-arm CER of 0.000% and output JSON matching field for field, including
+segment start and end to the microsecond and per-segment generated-token counts.
+Both arms scored the same 19.72% WER and 4.12% CER against the corpus reference
+transcripts. All 14 admissible invocations produced byte-identical output while
+wall time moved 30% and RSS moved 3 GiB. No NaN, empty segment, OOM retry,
+truncation retry, repetition-guard trip, or decoder fallback occurred in any run.
+
+Peak process RSS understates device memory on this backend: model weights live in
+Metal unified-memory buffers owned by the MPS caching allocator rather than in
+resident host pages, and RSS for identical work varied between 5.29 and 8.30 GiB
+across runs with byte-identical output. Device-side sampling on a real run peaked
+at 3.93 GiB allocated and 4.33 GiB driver-allocated against a 17.76 GiB
+recommended budget. Draw memory conclusions from the device counters, not RSS.
+
+Batch size is static at the MPS default of 8. The adaptive controller reads memory
+only on CUDA, so its growth path is inert here while OOM splitting and learned
+caps stay active.
+
+### Self-consistency caveat
+
+This is **self-consistency evidence, not parity with the released CUDA baseline**,
+and no such parity is claimed. Three limits:
+
+- The balanced 500-file baseline is not reproducible from this repository. The
+  datasets are named above but the file selection is not stored here, so retained
+  transcript comparison was unavailable. The substitute is a locally assembled
+  8-clip FLEURS subset, manifested with per-file hashes in
+  `reports/apple-silicon-corpus-manifest.json`. The audio and transcript files
+  rebuild byte-for-byte through `scripts/build_validation_corpus.py`; the
+  manifest itself carries a generation date and tool versions, so it reproduces
+  in substance rather than byte-identically.
+- The gated default checkpoint was unavailable on the validation host, so the runs
+  used the third-party ungated mirror `evewashere/cohere-transcribe-03-2026-ungated`
+  at revision `29b9036c`. These numbers characterize the **MPS platform path, not
+  the released checkpoint**.
+- 78 seconds of clean single-segment read speech is the easiest case for argmax
+  stability. The finding is that the MPS FP16 path is numerically sound on this
+  corpus, not that it is bit-exact with CPU FP32 everywhere. Longer audio, more
+  segments, and larger batches give FP16 rounding more chances to flip a token.
 
 ## Output and Alignment Modes
 
