@@ -1,0 +1,22 @@
+[project]
+name = "telegram-archive"
+version = "0.1.0"
+description = "Telegram Knowledge Archive pipeline"
+requires-python = ">=3.11"
+dependencies = ["boto3"]
+
+[project.scripts]
+archive = "archive.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/archive"]
+
+[tool.ruff]
+line-length = 90
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]

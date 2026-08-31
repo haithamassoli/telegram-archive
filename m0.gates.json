@@ -1,0 +1,18 @@
+{
+  "configHash": "d27d1fb0a633fb8273f793655bd8ef82e6100da90f63340d1f9bb16c609bc4d5",
+  "codec": {
+    "decision": null,
+    "candidates": ["opus", "aac"],
+    "testedOn": [],
+    "notes": "Phase-0 gate: seek + HTTP Range behaviour on iOS Safari, Android Chrome, desktop. Fill in decision + testedOn once verified on real devices."
+  },
+  "gpuBenchmark": {
+    "device": null,
+    "rtfX": null,
+    "filesPerBatch": null,
+    "peakMemoryGb": null,
+    "archiveHours": null,
+    "projectedRuntimeHours": null,
+    "notes": "Written by `archive bench <audio...> --archive-hours N`."
+  }
+}
