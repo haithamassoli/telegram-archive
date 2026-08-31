@@ -46,8 +46,9 @@ pipeline. Intel Macs are out of scope — no MPS, and no measured CPU-only claim
   resolves to TorchCodec (`audio/backends.py:32`).
 - `--alignment word` completes a real transcription on MPS.
 - Output-lock contention behaves as specified below.
-- CLI and Python API produce identical transcripts, timing, and provenance for
-  equivalent options.
+- CLI and Python API produce identical text and segment/word/cue timestamps,
+  matching resolved configuration, and matching model provenance for equivalent
+  options. Wall-clock timings are measured, not compared for equality.
 - Reusable-model lifecycle: one-shot cleanup, segment/text ASR retention,
   word-mode ASR eviction, post-alignment reload.
 
@@ -105,10 +106,14 @@ System Python is 3.14.6 and there is no `python` on PATH; `requires-python` is
 cd cohere-transcribe
 uv venv --python 3.12
 uv sync --locked --group dev --extra word --extra onnx --extra auditok
-uv run cohere-transcribe-doctor
-uv run cohere-transcribe-doctor --mode word
-uv run pytest
+uv run --no-sync cohere-transcribe-doctor
+uv run --no-sync cohere-transcribe-doctor --mode word
+uv run --no-sync pytest
 ```
+
+`--no-sync` follows `docs/development.md:28`: it keeps an implicit
+synchronization from replacing the environment's device-specific Torch build.
+Every later `uv run` in this plan uses it too.
 
 `quantized` is deliberately omitted — bitsandbytes is CUDA-gated in two places
 (`preflight.py:58`, `asr/model.py:130`) and the arm64 wheel ships no MPS kernels.
@@ -135,7 +140,7 @@ Two adaptations:
 Otherwise run it as written, both smoke scripts included. Every number in Steps 4
 and 5 comes from this installed wheel.
 
-## Step 4 — Precision: measure, then decide
+## Step 4 — Precision: validate the shipped path
 
 ### 4a. Kernel probe (fail-fast gate, minutes, no model download)
 
@@ -150,62 +155,63 @@ matches shipped behavior. A difference between the two runs *is* the finding.
 
 Scope that override to the probe only. `_environment.py:10` uses `setdefault`, so
 a caller-set `0` propagates into the real runtime — end-to-end validation in
-Steps 4b and 5 runs at the shipped default, or it measures a configuration we do
-not ship.
+Steps 4b, 4d, and 5 run at the shipped default, or they measure a configuration
+we do not ship.
 
 This probe can only **veto** a dtype, never approve one. The existing
 single-allocation check (`engine.py:100`) is not this: it proves BF16 tensors can
 be allocated and nothing more, which is why it stays where it is, guarding
 explicit `--dtype bf16`, and is never promoted into the `auto` decision.
 
-### 4b. Three-arm model measurement
+### 4b. Precision validation (required for support)
 
-On a fixed Arabic and English subset, using the installed wheel:
+`auto` cannot change on this evidence (see below), so this step validates the
+shipped path rather than adjudicating a dtype. Two arms, on a fixed Arabic and
+English subset, using the installed wheel at shipped environment defaults:
 
-| Arm | Purpose |
+| Arm | Scope |
 |---|---|
-| `--device cpu --dtype fp32` | Numerical reference. Slow; small subset only. |
-| `--device mps --dtype fp16` | Current `auto` behavior. |
-| `--device mps --dtype bf16` | Hypothesis. |
+| `--device cpu --dtype fp32` | **Once per reference file.** Numerical reference. |
+| `--device mps --dtype fp16` | The shipped `auto` behavior. Validate fully. |
 
-CPU FP32 is not optional. Without it, an FP16-vs-BF16 disagreement cannot be
-attributed — you cannot separate "MPS BF16 is inaccurate" from "the model is
-inaccurate on this audio." The repository already treats FP32 as the numerical
-reference for alignment (`docs/performance.md:320`).
+CPU FP32 runs once per file, not repeatedly — it is a correctness reference, not
+a performance arm, and the repository already treats FP32 that way for alignment
+(`docs/performance.md:320`).
 
-Record per arm: transcript divergence against the CPU FP32 arm, WER/CER where
-references exist, wall-time median, process RSS, and every failure, NaN, empty
-segment, OOM retry, and repetition-guard trip.
+Record for the MPS FP16 arm: transcript divergence against CPU FP32, WER/CER
+where references exist, wall-time median, process RSS, and every failure, NaN,
+empty segment, OOM retry, and repetition-guard trip.
 
-### 4c. Decision rule — fixed now, not after the numbers
+**Pass condition:** MPS FP16 completes cleanly and its divergence from CPU FP32
+is explainable as precision, not corruption. NaNs, empty segments, or systematic
+divergence block support and reopen the runtime-change path.
 
-**Protocol.** Five alternating runs per arm; report medians. Fewer than five
-supports completion only, never a speed claim.
+### 4c. Why `auto` does not change
 
-**Margin.** BF16 median wall time must be ≤ 110% of the FP16 median.
+`auto` (`engine.py:81`) stays FP16 regardless of how well BF16 performs on this
+machine. BF16 is emulated through FP32 on earlier M-series parts, so an M3 BF16
+win can be a serious regression on M1 and M2. A default that dispatches on
+hardware nobody measured is not a measured default. Changing `auto` requires BF16
+measurements across M-series generations — out of scope for this release.
 
-**Material transcript difference.** Any NaN, empty segment, or repetition-guard
-trip that FP16 does not also produce; or CER divergence from the CPU FP32 arm
-exceeding 0.5 percentage points.
+`engine.py:81` and `tests/test_cli.py:220` are therefore untouched, and Step 6 has
+**no runtime edit available to it** unless Step 4b or Step 5 fails. That is the
+expected result, not a disappointment.
 
-**What an M3 result may change: documentation only.**
+### 4d. BF16 characterization — optional follow-up
 
-`auto` (`engine.py:81`) stays FP16 regardless of how well BF16 performs here. BF16
-is emulated through FP32 on earlier M-series parts, so an M3 BF16 win can be a
-serious regression on M1 and M2. A default that dispatches on hardware nobody
-measured is not a measured default. Changing `auto` requires BF16 measurements on
-older chips too — out of scope for this release.
+Not required for support. Run it only to decide whether to document `--dtype
+bf16` as an M3-validated explicit option.
 
-So the reachable outcomes are:
+Add a `--device mps --dtype bf16` arm. Five alternating runs against FP16, report
+medians. Document the flag only if BF16 median wall time is ≤ 110% of the FP16
+median **and** BF16 produces no NaN, empty segment, or repetition-guard trip that
+FP16 does not also produce, and no CER divergence from CPU FP32 exceeding 0.5
+percentage points above FP16's.
 
-- BF16 passes both criteria → **document `--dtype bf16` as an M3-validated
-  explicit option.** No runtime change. `engine.py:81` and `tests/test_cli.py:220`
-  are untouched.
-- BF16 fails either criterion → record the measured non-difference. Nothing
-  changes anywhere.
-
-Step 6 therefore has **no runtime edit available to it** on this evidence. That
-is the expected result, not a disappointment.
+If BF16 misses either bar, that is a **measured limitation of BF16 on this
+platform** — a documentable finding about the flag, not an absence of difference.
+Record it and leave the flag undocumented.
 
 **If `--dtype bf16` is documented, it carries a caveat.** The guard at
 `engine.py:99-107` allocates one BF16 tensor; on a machine where BF16 is
@@ -243,8 +249,8 @@ source.
 Only failures and measurements authorize edits. On the evidence this plan can
 produce, expect:
 
-- **No runtime source change.** Step 4c closes that path; only a Step 5 failure
-  could reopen it.
+- **No runtime source change.** Step 4c closes that path; only a Step 4b or
+  Step 5 failure could reopen it.
 - A `macos-latest` CI job and the Step 4a probe script (Step 7).
 - Documentation and metadata:
   - `pyproject.toml:28` — add `Operating System :: MacOS :: MacOS X`.
@@ -252,7 +258,8 @@ produce, expect:
     macOS 14+, with the M3/24 GB validation qualifier.
   - `docs/architecture.md:201`, `docs/usage.md:530` — replace "unvalidated" with
     the measured result and its scope.
-  - `docs/usage.md:541` — if 4c passes, document `--dtype bf16` as an
+  - `docs/usage.md:541` — if the optional 4d follow-up passes, document
+    `--dtype bf16` as an
     M3-validated explicit option, with the emulation caveat. State that `auto`
     remains FP16 and why.
   - `docs/development.md:120` — record the two Step 3 adaptations so the next
@@ -312,8 +319,9 @@ Until then, sweep `--batch-size` manually and record what works.
 
 ## Order
 
-1 → 2 → 3 → 4a → 4b/4c → 5 → 6 → 7.
+1 → 2 → 3 → 4a → 4b → 5 → 6 → 7. Step 4d is optional and may run any time
+after 4b.
 
-Step 3 precedes measurement so the evidence is admissible. Step 4a precedes 4b so
-a dead dtype dies before a gated model download. Step 5 precedes Step 6 so no
+Step 3 precedes measurement so the evidence is admissible. Step 4a precedes 4b so a
+broken kernel path dies before a gated model download. Step 5 precedes Step 6 so no
 edit lands without a failure behind it. `rm -rf "$WHEEL_TEST"` runs after Step 5.
