@@ -1,0 +1,602 @@
+<title>أرشيف تيليجرام المعرفي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#EFF2F0; --surface:#FFFFFF; --surface-2:#F6F8F7;
+    --ink:#14201D; --ink-soft:#3E4F4A; --muted:#687974;
+    --line:#DDE4E1; --line-strong:#C4CFCB;
+    --accent:#0E6B58; --accent-soft:#E2F0EB; --accent-ink:#0A4C3F;
+    --brass:#8A6A2A; --brass-soft:#F4EEDF;
+    --alert:#A33227; --alert-soft:#F8E7E4;
+    --shadow:0 1px 2px rgba(20,32,29,.05), 0 8px 24px -16px rgba(20,32,29,.25);
+    --serif:"Amiri", "Times New Roman", serif;
+    --sans:"IBM Plex Sans Arabic", "Segoe UI", system-ui, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1614; --surface:#161F1D; --surface-2:#1B2523;
+      --ink:#E4EBE8; --ink-soft:#B6C4C0; --muted:#8A9A95;
+      --line:#26332F; --line-strong:#35443F;
+      --accent:#54C0A4; --accent-soft:#12302A; --accent-ink:#8FD9C4;
+      --brass:#C9A75E; --brass-soft:#2C2718;
+      --alert:#E08376; --alert-soft:#33201C;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1614; --surface:#161F1D; --surface-2:#1B2523;
+    --ink:#E4EBE8; --ink-soft:#B6C4C0; --muted:#8A9A95;
+    --line:#26332F; --line-strong:#35443F;
+    --accent:#54C0A4; --accent-soft:#12302A; --accent-ink:#8FD9C4;
+    --brass:#C9A75E; --brass-soft:#2C2718;
+    --alert:#E08376; --alert-soft:#33201C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.75; -webkit-font-smoothing:antialiased;}
+  .page{direction:rtl; max-width:1180px; margin:0 auto; padding:0 24px 96px;}
+  *{box-sizing:border-box;}
+  h1,h2,h3,h4{font-family:var(--serif); font-weight:700; text-wrap:balance; line-height:1.35; margin:0;}
+  p{margin:0;}
+  a{color:var(--accent-ink); text-decoration-color:var(--line-strong); text-underline-offset:3px;}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px;}
+  code,.mono,.k{font-family:var(--mono); font-size:.86em; direction:ltr; unicode-bidi:isolate;}
+  code{background:var(--surface-2); border:1px solid var(--line); border-radius:5px; padding:.05em .35em;}
+
+  /* ---- masthead ---- */
+  .masthead{padding:64px 0 40px; border-bottom:1px solid var(--line);}
+  .eyebrow{font-size:.78rem; letter-spacing:.16em; color:var(--muted); font-weight:600;}
+  .masthead h1{font-size:clamp(2.4rem,5.5vw,3.6rem); margin:14px 0 10px;}
+  .lede{font-size:1.12rem; color:var(--ink-soft); max-width:62ch;}
+  .badges{display:flex; flex-wrap:wrap; gap:8px; margin-top:22px;}
+  .badge{font-size:.78rem; font-weight:600; padding:5px 11px; border-radius:999px; border:1px solid var(--line-strong); color:var(--ink-soft); background:var(--surface);}
+  .badge.frozen{background:var(--accent-soft); border-color:transparent; color:var(--accent-ink);}
+  .badge.mono{font-family:var(--mono); font-size:.72rem; font-weight:500;}
+
+  /* ---- metrics ---- */
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden; margin:36px 0 8px;}
+  .metric{background:var(--surface); padding:20px 18px;}
+  .metric .n{font-family:var(--serif); font-size:2.1rem; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;}
+  .metric .l{font-size:.82rem; color:var(--muted); margin-top:8px;}
+
+  /* ---- layout ---- */
+  .shell{display:grid; grid-template-columns:1fr; gap:48px; margin-top:56px;}
+  @media(min-width:1000px){ .shell{grid-template-columns:230px 1fr; gap:56px;} }
+  nav.toc{align-self:start; font-size:.9rem;}
+  @media(min-width:1000px){ nav.toc{position:sticky; top:24px; max-height:calc(100vh - 48px); overflow:auto;} }
+  nav.toc ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  nav.toc a{display:block; padding:5px 10px; border-radius:6px; text-decoration:none; color:var(--ink-soft); border-right:2px solid transparent;}
+  nav.toc a:hover{background:var(--surface); color:var(--ink); border-right-color:var(--accent);}
+  nav.toc .tocgap{margin-top:14px; font-size:.74rem; letter-spacing:.14em; color:var(--muted); font-weight:600; padding:0 10px;}
+
+  main{min-width:0; display:flex; flex-direction:column; gap:56px;}
+  section{scroll-margin-top:20px; display:flex; flex-direction:column; gap:18px;}
+  section > h2{font-size:1.75rem; padding-bottom:12px; border-bottom:2px solid var(--ink); display:flex; align-items:baseline; gap:12px;}
+  section > h2 .num{font-family:var(--mono); font-size:.8rem; font-weight:500; color:var(--accent); letter-spacing:.05em;}
+  section p{max-width:68ch;}
+  h3{font-size:1.18rem;}
+  .sub{color:var(--muted); font-size:.92rem;}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px 24px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:12px;}
+  .cards{display:grid; gap:16px;}
+  @media(min-width:700px){ .cards.two{grid-template-columns:1fr 1fr;} }
+
+  ul.plain{margin:0; padding:0 1.2em 0 0; display:flex; flex-direction:column; gap:9px;}
+  ul.plain li{padding-inline-start:4px;}
+  ul.plain li::marker{color:var(--accent);}
+
+  /* ---- rules list ---- */
+  .rules{counter-reset:r; display:flex; flex-direction:column; gap:12px;}
+  .rule{display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px 18px;}
+  .rule .rn{counter-increment:r; font-family:var(--mono); font-size:.78rem; font-weight:500; color:var(--accent-ink); background:var(--accent-soft); width:26px; height:26px; border-radius:7px; display:grid; place-items:center;}
+  .rule .rn::before{content:counter(r);}
+  .rule b{display:block; margin-bottom:2px;}
+
+  /* ---- identity ladder ---- */
+  .ladder{display:flex; flex-direction:column; gap:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--surface);}
+  .rung{display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:14px 20px; border-bottom:1px solid var(--line);}
+  .rung:last-child{border-bottom:0;}
+  .rung .what{font-weight:600;}
+  .rung .id{font-family:var(--mono); font-size:.82rem; color:var(--accent-ink); background:var(--accent-soft); padding:4px 10px; border-radius:6px; direction:ltr; white-space:nowrap;}
+
+  /* ---- tables ---- */
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface);}
+  table{border-collapse:collapse; width:100%; min-width:520px; font-size:.93rem;}
+  th,td{text-align:right; padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top;}
+  thead th{background:var(--surface-2); font-size:.8rem; letter-spacing:.05em; color:var(--muted); font-weight:600; white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:0;}
+  td .k{color:var(--accent-ink);}
+
+  /* ---- schema / tree blocks ---- */
+  pre.tree{margin:0; overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; direction:ltr; text-align:left; font-family:var(--mono); font-size:.82rem; line-height:1.85; color:var(--ink-soft);}
+  pre.tree b{color:var(--accent-ink); font-weight:500;}
+  pre.tree i{color:var(--muted); font-style:normal;}
+
+  /* ---- phases ---- */
+  .phase{display:grid; grid-template-columns:auto 1fr; gap:18px;}
+  .phase .spine{display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .phase .dot{width:34px; height:34px; border-radius:10px; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-family:var(--mono); font-size:.8rem; font-weight:500; border:1px solid var(--line);}
+  .phase .line{flex:1; width:2px; background:var(--line);}
+  .phase:last-child .line{display:none;}
+  .phase .body{padding-bottom:26px; display:flex; flex-direction:column; gap:10px;}
+  .phase h3{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px;}
+  .phase h3 .cost{font-family:var(--sans); font-size:.78rem; font-weight:600; color:var(--brass); background:var(--brass-soft); padding:3px 9px; border-radius:999px;}
+
+  /* ---- milestones ---- */
+  .ms{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); overflow:hidden;}
+  .ms > summary{list-style:none; cursor:pointer; padding:18px 22px; display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center;}
+  .ms > summary::-webkit-details-marker{display:none;}
+  .ms .tag{font-family:var(--mono); font-size:.8rem; font-weight:500; color:var(--accent-ink); background:var(--accent-soft); padding:5px 9px; border-radius:7px;}
+  .ms .ttl{font-family:var(--serif); font-size:1.15rem; font-weight:700;}
+  .ms .count{font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .ms .count::after{content:" ▾"; color:var(--line-strong);}
+  .ms[open] .count::after{content:" ▴";}
+  .ms .inner{padding:0 22px 22px; display:flex; flex-direction:column; gap:16px; border-top:1px solid var(--line); margin-top:2px; padding-top:18px;}
+  .goal{display:grid; gap:10px;}
+  .goal div{display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:baseline;}
+  .goal span.lbl{font-size:.76rem; font-weight:700; letter-spacing:.08em; color:var(--muted); white-space:nowrap;}
+  ul.tasks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  ul.tasks li{display:grid; grid-template-columns:auto 1fr; gap:12px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:.95rem;}
+  ul.tasks li:last-child{border-bottom:0;}
+  ul.tasks li::before{content:""; width:15px; height:15px; margin-top:.4em; border:1.5px solid var(--line-strong); border-radius:4px; background:var(--surface-2);}
+  .subhead{font-size:.78rem; font-weight:700; letter-spacing:.08em; color:var(--brass); margin-top:6px;}
+
+  .note{background:var(--accent-soft); border-radius:10px; padding:16px 20px; color:var(--accent-ink); font-size:.95rem;}
+  .note.warn{background:var(--brass-soft); color:var(--brass);}
+  .note.stop{background:var(--alert-soft); color:var(--alert);}
+  .note b{font-weight:700;}
+
+  footer{margin-top:72px; padding-top:24px; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem; display:flex; flex-wrap:wrap; gap:8px 20px; justify-content:space-between;}
+  @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important;} }
+</style>
+
+<div class="page" dir="rtl" lang="ar">
+
+<header class="masthead">
+  <div class="eyebrow">تقرير الخطة والمهام · الإصدار 2.2</div>
+  <h1>أرشيف تيليجرام المعرفي</h1>
+  <p class="lede">خطة تنفيذية مجمّدة لبناء أرشيف دائم وقابل للبحث لدروس ومقالات القنوات: تنزيل كل رسالة وكل ملف صوتي، تفريغها آليًا، تجميعها في دروس ذات هوية ثابتة، ثم إتاحتها عبر بحث عربي ومشغّل صوتي بروابط زمنية.</p>
+  <div class="badges">
+    <span class="badge frozen">الحالة: مجمّدة — لا وثائق معمارية بعد الآن</span>
+    <span class="badge mono">Python · Telethon</span>
+    <span class="badge mono">Convex</span>
+    <span class="badge mono">Cloudflare R2</span>
+    <span class="badge mono">cohere-transcribe</span>
+    <span class="badge mono">Meilisearch</span>
+    <span class="badge mono">FFmpeg / ffprobe</span>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="n">8</div><div class="l">مراحل تنفيذ (0 → 7)</div></div>
+    <div class="metric"><div class="n">8</div><div class="l">محطات مقابلة (M0 → M7)</div></div>
+    <div class="metric"><div class="n">59</div><div class="l">مهمة مرصودة</div></div>
+    <div class="metric"><div class="n">0</div><div class="l">مهمة منجزة حتى الآن</div></div>
+    <div class="metric"><div class="n">12</div><div class="l">جدول في Convex</div></div>
+    <div class="metric"><div class="n">4</div><div class="l">طفرات ذرية للتفرّد</div></div>
+  </div>
+</header>
+
+<div class="shell">
+
+<nav class="toc" aria-label="فهرس التقرير">
+  <ol>
+    <li><a href="#summary">الملخص التنفيذي</a></li>
+    <li><a href="#decisions">القرارات والتعديلات</a></li>
+    <li><a href="#identity">هرم الهوية</a></li>
+    <li><a href="#schema">مخطط Convex</a></li>
+    <li><a href="#r2">تخطيط التخزين R2</a></li>
+    <li><a href="#coord">التنسيق والتعافي</a></li>
+    <li><a href="#time">التوقيت والمقاطع</a></li>
+    <li><a href="#phases">المراحل الثماني</a></li>
+    <li class="tocgap">المحطات</li>
+    <li><a href="#m0">M0 — الأسس والبوابات</a></li>
+    <li><a href="#m1">M1 — أرشفة كل شيء</a></li>
+    <li><a href="#m2">M2 — تفريغ الأجزاء</a></li>
+    <li><a href="#m3">M3 — التنظيم والدروس</a></li>
+    <li><a href="#m4">M4 — بحث تجريبي</a></li>
+    <li><a href="#m5">M5 — التشغيل المدمج</a></li>
+    <li><a href="#m6">M6 — المراجعة والمزامنة</a></li>
+    <li><a href="#m7">M7 — التقسية والصلة</a></li>
+    <li class="tocgap">ختامًا</li>
+    <li><a href="#freeze">معايير التجميد</a></li>
+    <li><a href="#migration">الهجرة من الإصدار الأول</a></li>
+    <li><a href="#risks">المخاطر</a></li>
+    <li><a href="#open">بنود مفتوحة</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="summary">
+  <h2><span class="num">§0</span> الملخص التنفيذي</h2>
+  <p>الهدف النهائي: أرشيف دائم لا يعتمد على بقاء تيليجرام، يجعل كل درس صوتي وكل مقال نصي قابلًا للبحث بالعربية، وقابلًا للاستماع من اللحظة الدقيقة التي وردت فيها الكلمة.</p>
+  <p>الفكرة المعمارية الحاكمة أن كل مخرَج في المسار يُعرَّف بهويته المحسوبة من مدخلاته، لا براية حالة (flag) في قاعدة البيانات. فإذا تغيّر الإعداد أو تغيّر ترتيب أجزاء الدرس تغيّر المفتاح، وبات القديم قديمًا من تلقاء نفسه، دون حاجة إلى منطق «إبطال» يدوي. هذا ما يجعل إعادة تشغيل أي مرحلة عملية آمنة ومتوقعة.</p>
+  <div class="cards two">
+    <div class="card">
+      <h3>ما لا يمكن تعويضه</h3>
+      <p class="sub">الأرشيف الخام (كل رسالة وكل ملف صوتي فريد) هو الأصل الوحيد غير القابل لإعادة الإنتاج، ومحكوم بسرعة تيليجرام لا بسرعتنا. لذلك يبدأ M1 فور اكتمال حواجزه، ولا ينتظر بقية التصميم.</p>
+    </div>
+    <div class="card">
+      <h3>ما يمكن إعادة إنتاجه</h3>
+      <p class="sub">التفريغ والتجميع والدمج والفهرسة كلها مشتقات: تُحذَف وتُبنى من جديد متى تغيّر الإعداد. لا شيء بعد M1 يستوجب العودة إلى تيليجرام مرة أخرى.</p>
+    </div>
+  </div>
+  <div class="note"><b>قاعدة الإيقاع:</b> M0 ← M1 ← M2 ← … ← M7، بتداخلين مسموحين فقط: بدء M1 فور انتهاء حواجزه في M0، وبدء دفعات M2 على أرشيف جزئي بعد تثبيت الإعداد وقياس الأداء — على أن يظل خروج M2 مشروطًا باكتمال M1.</div>
+</section>
+
+<section id="decisions">
+  <h2><span class="num">§0</span> القرارات المتبنّاة والتعديلات</h2>
+  <p>اعتُمد مقترح التغيير 2.2 كما ورد في: حالة الدرس غير الخطية، ومفتاحا <span class="k">lessonKey</span> و<span class="k">assemblyHash</span>، وفرض التفرّد عبر طفرات Convex الذرية، والتعافي من نافذة الانهيار، و<span class="k">configHash</span> محسوب مسبقًا، وفصل <span class="k">pipelineLocks</span> عن سجل <span class="k">pipelineRuns</span>، وهرم الهوية، ومسارات إعادة المعالجة، والتجميد المعماري.</p>
+  <p class="sub">ملاحظة تقنية على التفرّد: فهارس Convex ليست قيود UNIQUE في SQL؛ لكن الطفرات تسلسلية، فيصبح «البحث ثم الكتابة» داخل طفرة واحدة كافيًا لفرض الثبات. وجود أكثر من صف في استعلام «فريد» يُعامَل خطأ سلامة، لا اختيارًا صامتًا لأحدها.</p>
+  <div class="rules">
+    <div class="rule"><div class="rn"></div><div><b>أسبقية التدخل اليدوي (ثابت جديد)</b>الدرس المعتمَد <span class="k">approved</span> مُجمَّد ضد إعادة التركيب الآلية. إذا عُدِّلت أو حُذفت رسالة مصدر فيه، يُخفَّض إلى <span class="k">needs_review</span> ولا يُعاد تركيبه صامتًا. أما دروس <span class="k">auto</span> فتُعاد بحرية. بدون هذه القاعدة يتدمّر «المنظِّم القابل لإعادة التشغيل» و«المراجعة اليدوية» أحدهما بالآخر.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>حذف الحقل <span class="k">needsReview</span></b>لأنه تكرار لما تعبّر عنه قيمة <span class="k">reviewStatus == needs_review</span>.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>مدخل <span class="k">assemblyHash</span></b>قائمة بصمات الأجزاء المرتّبة فقط (JSON قانوني). الإزاحات مشتقّة وتعيش في جسم المخرَج؛ إدخالها في البصمة يجعل هوية الدرس تتبدّل مع كل إعادة تشغيل لـ ffprobe.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>تدرّج <span class="k">lessonSources</span></b>صفوف <span class="k">telegram</span> و<span class="k">youtube</span> تُملأ في المرحلة 3 بلا كلفة (من رسائل الروابط ومن خريطة يوتيوب↔تيليجرام في الإصدار الأول)، وتمنح المستخدم رابط «شاهد على يوتيوب». أما صفوف <span class="k">legacy</span> فلا تُنشأ إلا إذا كان فرق التغطية في §8 غير فارغ.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>تثبيت مراجعة النموذج</b>تُحلّ <span class="k">modelRevision</span> من فرع إلى commit مرة واحدة وقت الإعداد وتُخزَّن. ويفشل العامل فورًا إذا اختلف الافتراضي المحلول لاحقًا عن القيمة المثبّتة.</div></div>
+  </div>
+</section>
+
+<section id="identity">
+  <h2><span class="num">§1</span> هرم الهوية — جوهر التصميم</h2>
+  <p>كل مستوى يشتق معرّفه ممّا قبله. لا حالة «قديم/جديد» تُحفظ: يُقاس التقادم بالمطابقة — مخرَج تفريغ الدرس يُعد حديثًا إذا وإذا فقط كان مفتاحه يحمل <span class="k">assemblyHash</span> الحالي للدرس و<span class="k">configHash</span> الفعّال. والقاعدة نفسها تسري على المقاطع والصوت المدمج.</p>
+  <div class="ladder">
+    <div class="rung"><span class="what">هوية الوسيط الخام</span><span class="id">sha256</span></div>
+    <div class="rung"><span class="what">هوية تفريغ الجزء</span><span class="id">sha256 + configHash</span></div>
+    <div class="rung"><span class="what">هوية الدرس</span><span class="id">lessonKey</span></div>
+    <div class="rung"><span class="what">هوية تركيب الدرس</span><span class="id">assemblyHash</span></div>
+    <div class="rung"><span class="what">هوية تفريغ الدرس</span><span class="id">assemblyHash + configHash</span></div>
+    <div class="rung"><span class="what">هوية الصوت المدمج</span><span class="id">mergedSha256</span></div>
+  </div>
+  <p class="sub">استقرار <span class="k">lessonKey</span> — المشتق حتميًا من المصدر، والمثبَّت في Convex عبر الرفع بالمفتاح — هو ما يشرعن استخدام <span class="k">lessonId</span> في مفاتيح R2 وفي معرّفات مقاطع Meilisearch.</p>
+</section>
+
+<section id="schema">
+  <h2><span class="num">§2</span> مخطط Convex</h2>
+  <p>اثنا عشر جدولًا. لا جدول لمقاطع التفريغ، ولا حقل حالة خطي واحد للدرس — فحالة الدرس موزّعة على محاور مستقلة (مراجعة، دمج، فهرسة) لأن هذه المحاور تتقدّم فعلًا بشكل مستقل.</p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>الجدول</th><th>ما يمثّله</th><th>حقول مفصلية</th></tr></thead>
+      <tbody>
+        <tr><td class="k">channels</td><td>القنوات المؤرشفة ونقطة المزامنة الأخيرة</td><td class="k">username, lastMessageId, lastSyncAt</td></tr>
+        <tr><td class="k">telegramMessages</td><td>كل رسالة كما وردت، مع التعديل والحذف</td><td class="k">mediaType, semanticType, groupedId, editDate, deletedAt</td></tr>
+        <tr><td class="k">mediaObjects</td><td>صف واحد لكل ملف ثنائي فريد</td><td class="k">sha256, r2Key, durationMs, codec, sampleRate</td></tr>
+        <tr><td class="k">messageMedia</td><td>ربط الظهور بالملف (إعادة النشر = صف ربط فقط)</td><td class="k">messageId, mediaObjectId, telegramDocId</td></tr>
+        <tr><td class="k">partTranscripts</td><td>تفريغ جزء واحد تحت إعداد محدّد</td><td class="k">sha256 + configHash, status, attempts, rawR2Key</td></tr>
+        <tr><td class="k">articles</td><td>المقالات النصية المستخرجة</td><td class="k">normalizedTitle, normalizedText, indexVersion</td></tr>
+        <tr><td class="k">lessons</td><td>الدرس المركّب وهويته وحالته متعدّدة المحاور</td><td class="k">lessonKey, assemblyHash, reviewStatus, mergeStatus</td></tr>
+        <tr><td class="k">lessonParts</td><td>أجزاء الدرس بترتيبها وإزاحاتها الزمنية</td><td class="k">order, durationMs, offsetMs</td></tr>
+        <tr><td class="k">lessonSources</td><td>مصادر الدرس: تيليجرام، يوتيوب، أو موروث</td><td class="k">sourceType, url, isPrimary</td></tr>
+        <tr><td class="k">failures</td><td>الإخفاقات غير المحلولة لكل مرحلة</td><td class="k">stage, refKey, attempts, resolved</td></tr>
+        <tr><td class="k">pipelineLocks</td><td>قفل مفرد لكل مرحلة مع نبض حيّ</td><td class="k">stage, runId, heartbeatAt</td></tr>
+        <tr><td class="k">pipelineRuns</td><td>سجل تشغيل تراكمي لا يُحذف منه</td><td class="k">status, processedCount, wallTimeMs</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note"><b>الطفرات الذرية الأربع التي تفرض التفرّد المنطقي:</b> <span class="k">getOrCreateMediaObject(sha256)</span> · <span class="k">upsertPartTranscript(sha256, configHash)</span> · <span class="k">upsertLessonByKey(lessonKey)</span> · <span class="k">acquirePipelineStage(stage)</span> — وتوجد منذ اليوم الأول، لا لاحقًا.</div>
+</section>
+
+<section id="r2">
+  <h2><span class="num">§3</span> تخطيط التخزين في R2</h2>
+  <p>دلوان لا أكثر: دلو خاص دائم لا يُفتح للعامة أبدًا، ودلو عام للصوت المدمج القابل للتشغيل المباشر.</p>
+  <pre class="tree"><b>telegram-archive/</b>                        <i>(خاص · دائم)</i>
+  blobs/{sha256[:2]}/{sha256}.{ext}
+  meta/{channel}/{from:08d}-{to:08d}.jsonl.zst
+  meta/{channel}/manifest.json           <i>schemaVersion, range, count, batch sha256</i>
+  transcripts/{sha256}/{configHash}.json
+  lesson-transcripts/{lessonId}/{assemblyHash}-{configHash}.json
+  legacy/assoli-v1/                      <i>تصدير لمرة واحدة — §8</i>
+
+<b>lessons-media/</b>                           <i>(عام عبر نطاق مخصّص)</i>
+  lessons/{lessonId}/{mergedSha256}.{m4a|opus}</pre>
+</section>
+
+<section id="coord">
+  <h2><span class="num">§4</span> التنسيق والتكرار الآمن والتعافي</h2>
+  <p>ثماني قواعد تسري على كل أمر دفعي في كل مرحلة، بلا استثناء.</p>
+  <div class="rules">
+    <div class="rule"><div class="rn"></div><div><b>قانون ترتيب الكتابة</b>المخرَج إلى R2 أولًا، ثم تعليم Convex بـ <span class="k">done</span> ثانيًا. في كل مرحلة.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>قاعدة التخطي (المسار السريع)</b>يُتخطّى العنصر إذا وفقط إذا كان سجل Convex المرجعي بحالة <span class="k">done</span>.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>التعافي من نافذة الانهيار (المسار البطيء)</b>للحالات <span class="k">pending</span> أو <span class="k">processing</span> المتقادمة أو <span class="k">failed</span> أو المفقودة فقط: يُحسب المفتاح المتوقع حتميًا، ويُطلب <span class="k">HEAD</span> عليه؛ إن وُجد وصحّ يُرفَّع Convex إلى <span class="k">done</span> ويُتخطّى، وإن غاب يُعالَج. العامل يعرف بصمة المدخل والإعداد والمفتاح المتوقع <em>قبل</em> بدء الاستدلال.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>أمر <span class="k">reconcile-artifacts</span></b>ثلاث حالات: Convex منجَز وR2 مفقود ← يُعلَّم لإعادة المعالجة؛ R2 موجود وConvex غير منجَز ← يُتحقَّق ويُصلَّح؛ كائن يتيم في R2 بلا مرجع ← يُبلَّغ عنه فقط، ولا يُحذف أرشيف تلقائيًا أبدًا.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>أقفال المراحل</b>قفل محلي <span class="k">flock</span> مع <span class="k">acquirePipelineStage</span>؛ يُعتبر القفل متروكًا إذا تجاوز النبض خمس دقائق. نبض كل 60 ثانية، وعند الخروج يُحرَّر القفل ويُضاف صف إلى سجل التشغيل بالأعداد.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>الإخفاقات أولًا</b>كل تشغيلة تستنزف إخفاقات مرحلتها غير المحلولة قبل أي عمل جديد، بسقف محاولات، ثم تُرفع إلى صفحة العمليات.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>أسبقية التدخل اليدوي</b>إعادة التشغيل لا تمسّ التركيبات المعتمَدة، وتغيّر رسالة المصدر يخفّض الدرس إلى «بحاجة مراجعة».</div></div>
+    <div class="rule"><div class="rn"></div><div><b>إعادة التشغيل الكامل تبقى مشروعة</b>للمنظِّم، وباني تفريغ الدرس، وباني المقاطع، وإعادة الفهرسة — مع مراعاة القاعدة السابقة.</div></div>
+  </div>
+  <h3>خريطة إعادة المعالجة</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>التغيير</th><th>الأثر المتسلسل</th></tr></thead>
+      <tbody>
+        <tr><td>تغيّر التجميع</td><td><span class="k">assemblyHash</span> جديد ← إعادة توليد تفريغ الدرس والمقاطع والدمج</td></tr>
+        <tr><td>تغيّر إعداد التفريغ</td><td><span class="k">configHash</span> جديد ← تفريغات أجزاء جديدة ← كل ما بعدها</td></tr>
+        <tr><td>تغيّر التطبيع أو التقطيع أو الفهرسة</td><td>إعادة بناء وثائق البحث فقط</td></tr>
+        <tr><td class="k">— أيٌّ منها —</td><td>لا شيء يستوجب إعادة التنزيل من تيليجرام</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="time">
+  <h2><span class="num">§5</span> التوقيت والمقاطع والتشغيل</h2>
+  <p>موضع الكلمة داخل الدرس = <span class="k">part.offsetMs + segment.startMs</span>. والإزاحات مجاميع تراكمية لمُدد ffprobe الملتقطة وقت الابتلاع؛ فمُدد تيليجرام نفسها بدقة الثانية الكاملة ولا تصلح لإزاحات بالمللي ثانية.</p>
+  <ul class="plain">
+    <li>المقاطع بين 45 و90 ثانية، بمعرّفات حتمية، مع وصل ذيل الجزء رقم N برأس الجزء N+1 دائمًا حتى لا تضيع الجملة المقطوعة على الحدود.</li>
+    <li>المشغّل ينتقل إلى <span class="k">max(0, startMs − 2000)</span> — ثانيتان قبل الموضع، تعويضًا عن تقريب الطوابع.</li>
+    <li>إعادة تفريغ الملف المدمج لدرس بعينه تبقى استثناءً رخيصًا ومتاحًا عند الحاجة.</li>
+  </ul>
+</section>
+
+<section id="phases">
+  <h2><span class="num">§6</span> المراحل الثماني</h2>
+
+  <div class="phase"><div class="spine"><div class="dot">0</div><div class="line"></div></div><div class="body">
+    <h3>الوصول والبوابات وتثبيت الإعداد <span class="cost">نصف يوم إلى يوم</span></h3>
+    <p>كل قرار لا رجعة فيه يُثبَّت هنا: حساب تيليجرام مخصّص وملف الجلسة كسرّ، وشروط نموذج HF، وتثبيت إعداد التفريغ وحساب بصمته وتسجيلها قبل أي استدلال، وقياس أداء بطاقة الرسوميات الفعلية لاشتقاق جدول المرحلة 2، وبوابة الترميز (Opus مقابل AAC) على iOS وأندرويد وسطح المكتب، وتصدير بيانات الإصدار الأول أولًا، ثم تجهيز Convex وR2 وMeilisearch.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">1</div><div class="line"></div></div><div class="body">
+    <h3>أرشفة كل شيء <span class="cost">محكومة بسرعة تيليجرام</span></h3>
+    <p>جلسة Takeout دائمة مع حفظ معرّفها ومعالجة تأخير التهيئة وموجات الانتظار، وسير زمني بنقاط تفتيش لكل قناة. لكل رسالة: رفع منظَّم إلى Convex، والقاموس الخام إلى دفعات <span class="k">jsonl.zst</span> مع بيان. ولكل ملف: تنزيل ← بصمة ← إنشاء أو استرجاع كائن الوسيط ← ffprobe ← رفع ← صفوف ← حذف المؤقت. قابل للقتل في أي لحظة دون فساد.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">2</div><div class="line"></div></div><div class="body">
+    <h3>تفريغ كل الأجزاء <span class="cost">حملة دفعية</span></h3>
+    <p>تحضير الملفات محليًا، ثم الاختيار بالمسار السريع والتعافي للبقية، ودفعات بنحو 500 ملف تحت قفل المرحلة، بمفرّغ دائم بالعربية مع دمج VAD. ولكل ملف يُرفع الناتج ثم يُعلَّم منجزًا، ويُتحقَّق من مطابقة الإعداد المعاد للمثبَّت — وأي اختلاف إخفاق، لا هوية جديدة. <b>الخروج:</b> ≥99% من البصمات الصوتية الفريدة منجزة.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">3</div><div class="line"></div></div><div class="body">
+    <h3>التنظيم <span class="cost">دالّة نقية — تقرأ Convex فقط</span></h3>
+    <p>مصنّف يحدّد النوع الدلالي للرسالة (مقال، عنوان درس، رابط، إعلان)، مع تعليم الصوت المُعاد توجيهه واستبعاده من دروس صوت الشيخ افتراضيًا. ثم استخراج المقالات، ومحلّل السلاسل والعناوين مختبَرًا على 50 عنوانًا حقيقيًا على الأقل لكل قناة ولكل حقبة، ثم التجميع بترتيب أدلة: المجموعة الأصلية ← عنوان يتلوه صوت متتابع ← الردود ← تأكيد رابط يوتيوب ← التقارب الزمني كسند. وأخيرًا التركيب بالمفتاح وحساب بصمة التركيب والإزاحات.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">3.5</div><div class="line"></div></div><div class="body">
+    <h3>باني تفريغ الدرس <span class="cost">مشتق وقابل للحذف</span></h3>
+    <p>دمج ملفات تفريغ الأجزاء مع الإزاحات في مخرَج واحد للدرس، وتعيين المؤشر إليه. يُعاد توليده تلقائيًا كلما تغيّرت بصمة التركيب.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">4</div><div class="line"></div></div><div class="body">
+    <h3>البحث — الإصدار صفر <span class="cost">تجريبي بجانب الإصدار الأول الحيّ</span></h3>
+    <p>مقاطع مبنية من مخرجات تفريغ الدروس، مع احتياطي على مستوى الجزء للصوت غير المجمَّع. فهرسا <span class="k">articles</span> و<span class="k">audio_chunks</span> بحقول بحث مطبَّعة وعرض أصلي ومرشّحات وترتيب. واجهة من اليمين إلى اليسار بتبويبات ومقتطفات وأوجه للسلاسل وروابط تيليجرام، وتشغيل الأجزاء عبر روابط موقّعة قصيرة العمر. <b>الخروج:</b> إعادة تشغيل سجلات استعلامات الإصدار الأول على النظامين كمجموعة اختبار للصلة.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">5</div><div class="line"></div></div><div class="body">
+    <h3>التشغيل المدمج</h3>
+    <p>مسار سريع بدامج التسلسل، واحتياطي بإعادة الترميز إلى الصيغة المعتمدة في البوابة. بصمة الملف المدمج ثم رفعه إلى الدلو العام، وتحذير إذا فرق مجموع المدد عن المدمج أكثر من 500 مللي ثانية. والمشغّل: قفزة ناقص ثانيتين، وروابط <span class="k">?t=</span>، ومعالجة التشغيل التلقائي.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">6</div><div class="line"></div></div><div class="body">
+    <h3>المراجعة والمزامنة المستمرة</h3>
+    <p>واجهة مراجعة بطابور مرتّب بالثقة، فيها معاينة وإعادة ترتيب وإضافة وحذف وتقسيم ودمج وإعادة تسمية؛ والاعتماد يولّد بصمة تركيب جديدة فتُعاد التوليدات في نطاق الدرس وحده. ومزامنة تدريجية على جلسة عادية: ما بعد آخر رسالة، مع إعادة فحص نحو 300 رسالة للتعديلات والحذف. ومؤقّتات النظام تحت الأقفال: مزامنة كل 15 دقيقة، فتفريغ المعلّق، ففهرسة المعلّق، ودمج ليلي.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">7</div><div class="line"></div></div><div class="body">
+    <h3>التقسية وضبط الصلة</h3>
+    <p>صفحة عمليات تُظهر أعداد المراحل والإخفاقات وحالة الأقفال وسجل التشغيل والمزامنة لكل قناة. ومصالحة المخرجات أسبوعيًا، وأغلفة إعادة محاولة، وتنظيف المؤقت، وتحديد معدّل لنقطة الروابط الموقّعة، ومفاتيح بأقل صلاحية. ثم ضبط الصلة من استعلامات حقيقية: صور الهمزة، والتشكيل، والتسامح مع الأخطاء الإملائية العربية، ومدة المقطع، ووزن العنوان.</p>
+  </div></div>
+</section>
+
+<section id="milestones">
+  <h2><span class="num">M</span> المحطات والمهام</h2>
+  <p>تحمل المحطات أرقام المراحل نفسها لتسهيل التتبّع. كل بند أدناه مهمة غير منجزة حتى الآن.</p>
+
+  <details class="ms" id="m0" open>
+    <summary><span class="tag">M0</span><span class="ttl">الأسس والبوابات وتصدير الموروث</span><span class="count">0 / 13</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>تثبيت كل قرار لا رجعة فيه، وإثبات كل اعتماد خارجي، وتأمين بيانات الإصدار الأول.</span></div>
+        <div><span class="lbl">الخروج</span><span>بصمة الإعداد محسوبة ومسجّلة؛ قرار الترميز مدوَّن؛ أرقام قياس الأداء مسجَّلة وجدول M2 مشتقّ منها؛ التصدير الموروث موثّق في R2؛ فاحص التفريغ ناجح؛ Convex وR2 وMeilisearch متاحة بمفاتيح محدودة الصلاحية.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>إنشاء حساب تيليجرام مخصّص، وحفظ ملف الجلسة <span class="k">.session</span> كسرّ خارج المستودع</span></li>
+        <li><span></span><span>قبول شروط نموذج HF، وضبط <span class="k">HF_TOKEN</span> و<span class="k">HF_HOME</span>، ونجاح <span class="k">cohere-transcribe-doctor --model-access</span></span></li>
+        <li><span></span><span>تثبيت إعداد التفريغ (النموذج، والمراجعة محلولة من فرع إلى commit مرة واحدة، واللغة عربية، وVAD ودمجه، والمحاذاة) ← JSON قانوني ← حساب وتسجيل <span class="k">configHash</span> قبل أي استدلال، مع فشل سريع عند أي انحراف</span></li>
+        <li><span></span><span>قياس أداء بطاقة الرسوميات الفعلية: نسبة الزمن الحقيقي، وحجم الدفعة، وذاكرة الفيديو ← زمن الأرشيف المتوقّع ← اشتقاق جدول M2</span></li>
+        <li><span></span><span>بوابة الترميز: سلوك القفز وطلبات المدى بين Opus وAAC على iOS Safari وأندرويد وسطح المكتب، وتدوين القرار</span></li>
+        <li><span></span><span>تصدير الموروث أولًا: تفريغات الإصدار الأول والتصحيحات البشرية وسجلات الاستعلامات وخريطة يوتيوب↔تيليجرام إلى <span class="k">legacy/assoli-v1/</span>، مع إبقاء الإصدار الأول حيًّا دون مساس</span></li>
+        <li><span></span><span>تجهيز Convex: المخطط الكامل مع الطفرات الذرية الأربع منذ اليوم الأول</span></li>
+        <li><span></span><span>تجهيز R2: دلو <span class="k">telegram-archive</span> خاص، ودلو <span class="k">lessons-media</span> عام بنطاق مخصّص، ومفاتيح محدودة لكل دلو</span></li>
+        <li><span></span><span>تجهيز Meilisearch: النسخة، ومفتاح الإدارة، ومفتاح البحث فقط</span></li>
+        <li><span></span><span>هيكل المستودع: مشروع Python، ووحدة إعداد تحمل الإعداد المثبَّت، و<span class="k">.gitignore</span> يغطي ملف الجلسة والأسرار والمجلدات المؤقتة</span></li>
+      </ul>
+      <div class="subhead">قرارات يجب إغلاقها — دون أن تعطّل M1</div>
+      <ul class="tasks">
+        <li><span></span><span>موقع بطاقة الرسوميات (جهاز مكتبي أم خادم) — يؤثّر في مؤقّتات M6 فقط</span></li>
+        <li><span></span><span>نطاق التنزيل في M1: قناتان فقط، أم إضافة <span class="k">swteat_alkulife</span> و<span class="k">swteat_k</span> بينما يعمل المنزِّل (التنزيل ≠ الفهرسة)</span></li>
+        <li><span></span><span>تدقيق ما يستحق الإنقاذ من الإصدار الأول: هل توجد تفريغات مصحّحة يدويًا؟ وهل في نموذج بياناته حسابات أو علامات أو تحليلات تستحق التصدير؟</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="ms" id="m1">
+    <summary><span class="tag">M1</span><span class="ttl">أرشفة كل شيء</span><span class="count">0 / 6</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>الأرشيف الخام كاملًا — كل رسالة وكل ملف ثنائي فريد — دائمًا في Convex وR2. أعلى محطات المشروع قيمة.</span></div>
+        <div><span class="lbl">الخروج</span><span>كل القنوات المشمولة مُزامنة بالكامل؛ الأعداد تطابق إحصاءات القناة؛ 20 فحصًا عشوائيًا لروابط تيليجرام تنجح؛ إثبات القتل والاستئناف نظيفًا.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>تهيئة جلسة Takeout: حفظ المعرّف، ومعالجة تأخير التهيئة وموجات الانتظار، وسير زمني، ونقطة تفتيش لكل قناة</span></li>
+        <li><span></span><span>ابتلاع الرسائل: رفع منظَّم (تحديد نوع الوسيط هنا، والنوع الدلالي فارغ) + القاموس الخام إلى دفعات مضغوطة مع بيان يحمل النسخة والمدى والعدد والبصمة</span></li>
+        <li><span></span><span>التقاط معلومات إعادة التوجيه، ومعرّف المجموعة، ومعرّف الرد، وتواريخ التعديل</span></li>
+        <li><span></span><span>مسار الوسائط لكل ملف: تنزيل ← بصمة ← إنشاء أو استرجاع كائن الوسيط (إعادة النشر = صف ربط فقط) ← ffprobe ← رفع الكتلة ← صفوف Convex ← حذف المؤقت</span></li>
+        <li><span></span><span>اختبار أمان القتل: القتل في منتصف قناة وفي منتصف ملف، ثم الاستئناف، والتحقق من غياب الصفوف المكرّرة والثغرات والملفات المؤقتة اليتيمة</span></li>
+        <li><span></span><span>جولة تحقق: الأعداد مقابل إحصاءات القناة، و20 فحصًا عشوائيًا لروابط تيليجرام مقابل التطبيق الحيّ</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="ms" id="m2">
+    <summary><span class="tag">M2</span><span class="ttl">تفريغ كل الأجزاء</span><span class="count">0 / 7</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>تفريغ منجَز لكل ملف صوتي فريد عمليًا، تحت الإعداد المثبَّت.</span></div>
+        <div><span class="lbl">الخروج</span><span>≥99% من البصمات الصوتية الفريدة بحالة منجَز للبصمة الفعّالة للإعداد.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>هيكل الأمر الدفعي (يُعاد استخدامه في كل المراحل اللاحقة): قفل محلي + قفل مرحلة، ونبض كل 60 ثانية، وعند الخروج تحرير وإضافة صف إلى سجل التشغيل</span></li>
+        <li><span></span><span>استنزاف الإخفاقات أولًا: إعادة محاولة غير المحلول قبل أي عمل جديد، بسقف محاولات ثم إظهار</span></li>
+        <li><span></span><span>الاختيار: تخطٍّ سريع للمنجَز، وتعافٍ من نافذة الانهيار لما عداه عبر المفتاح المتوقّع و<span class="k">HEAD</span>، مع إبقاء التخطي المحلي كحزام أمان</span></li>
+        <li><span></span><span>تحضير الكتل المطلوبة محليًا باسم <span class="k">{sha256}.{ext}</span> (نسخ مباشر)</span></li>
+        <li><span></span><span>مفرّغ دائم بالعربية مع دمج VAD وإخراج JSON، بدفعات بنحو 500 ملف تحت قفل المرحلة</span></li>
+        <li><span></span><span>لكل ملف: رفع الناتج ثم تعليمه منجزًا، والتحقق من مطابقة مصدرية الناتج للإعداد المثبَّت — والاختلاف إخفاق لا هوية جديدة</span></li>
+        <li><span></span><span>أمر المصالحة في وضع تفريغ الأجزاء بحالاته الثلاث، دون حذف تلقائي لأي كائن أرشيفي</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="ms" id="m3">
+    <summary><span class="tag">M3</span><span class="ttl">التنظيم وتفريغ الدروس</span><span class="count">0 / 9</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>تصنيف الرسائل، واستخراج المقالات، وتركيب الدروس بهوية ثابتة، وبناء مخرجات تفريغ الدروس. المنظِّم دالّة نقية وقابل لإعادة التشغيل بالكامل.</span></div>
+        <div><span class="lbl">الخروج</span><span>إعادة تشغيل كاملة على بيانات غير متغيّرة لا تُحدث شيئًا؛ لكل درس مخرَج تفريغ مطابق لبصمة تركيبه الحالية وبصمة الإعداد الفعّالة؛ فرق التغطية مع الإصدار الأول محسوم.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>المصنّف الأول ← النوع الدلالي ونسخة المصنّف؛ وتعليم الصوت المُعاد توجيهه واستبعاده من دروس صوت الشيخ افتراضيًا</span></li>
+        <li><span></span><span>استخراج المقالات ← صفوف بعنوان مطبَّع ومصدر عنوان</span></li>
+        <li><span></span><span>محلّل السلاسل والعناوين بكل حقوله ونسخته وثقته، مع مجموعة اختبار من 50 عنوانًا حقيقيًا على الأقل لكل قناة ولكل حقبة</span></li>
+        <li><span></span><span>التجميع الأول بترتيب الأدلة، ويُخرج نسخة التجميع والثقة وحالة المراجعة تلقائية أو بحاجة مراجعة</span></li>
+        <li><span></span><span>التركيب: الرفع بالمفتاح، وبصمة التركيب من قائمة بصمات الأجزاء المرتّبة فقط، وأجزاء الدرس بإزاحات متراكمة من مُدد الوسائط</span></li>
+        <li><span></span><span>مصادر الدرس: صف تيليجرام أساسي + صف يوتيوب مرآة من رسائل الروابط أو خريطة الإصدار الأول</span></li>
+        <li><span></span><span>فرض أسبقية التدخل اليدوي: إعادة التشغيل لا تمسّ المعتمَد، وتعديل أو حذف رسالة مصدر يخفّض المعتمَد إلى «بحاجة مراجعة» دون إعادة تركيب صامتة</span></li>
+        <li><span></span><span>فرق التغطية مع الإصدار الأول: ما هو على يوتيوب فقط يصير درسًا موروثًا عبر مصادر الدرس؛ وإذا كان الفرق فارغًا تُحذف تفريغات يوتيوب بضمير مرتاح</span></li>
+        <li><span></span><span>باني تفريغ الدرس: دمج تفريغات الأجزاء مع الإزاحات في مخرَج واحد وتعيين المؤشر، ويُعاد توليده تلقائيًا كلما تغيّرت بصمة التركيب</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="ms" id="m4">
+    <summary><span class="tag">M4</span><span class="ttl">البحث التجريبي بجانب الإصدار الحيّ</span><span class="count">0 / 7</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>مقالات ومقاطع صوتية قابلة للبحث خلف واجهة عربية صالحة للاستعمال.</span></div>
+        <div><span class="lbl">الخروج</span><span>إعادة تشغيل سجلات الاستعلامات على النظامين تُنتج مقارنة صلة مسجَّلة — وهي مجموعة الانحدار المرجعية في M7.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>باني المقاطع: 45–90 ثانية من مخرجات تفريغ الدروس، بمعرّفات حتمية، مع وصل ذيول الأجزاء برؤوس ما بعدها، واحتياطي على مستوى الجزء للصوت غير المجمَّع</span></li>
+        <li><span></span><span>فهرسا المقالات والمقاطع الصوتية: حقول بحث مطبَّعة، وحقول عرض أصلية، ومرشّحات القناة والسلسلة والدرس، وترتيب بالتاريخ</span></li>
+        <li><span></span><span>إثبات إعادة الفهرسة الكاملة من الصفر، وختم وقت الفهرسة ونسختها</span></li>
+        <li><span></span><span>استيراد التصحيحات اليدوية من الإصدار الأول كتجاوزات على التفريغ — وهي البيانات الوحيدة التي لا تستطيع أي بطاقة رسوميات إعادة إنتاجها</span></li>
+        <li><span></span><span>الواجهة: اتجاه من اليمين إلى اليسار، وتبويبا المقالات والصوت، والمقتطفات، وأوجه السلاسل، وروابط تيليجرام</span></li>
+        <li><span></span><span>تشغيل الأجزاء الخام عبر روابط R2 موقّعة قصيرة العمر مع دعم طلبات المدى وتجديد الرابط عند انتهائه، وبقاء الدلو الخام خاصًّا للأبد</span></li>
+        <li><span></span><span>خط أساس الصلة: إعادة تشغيل سجلات استعلامات الإصدار الأول على النظامين وتسجيل النتائج</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="ms" id="m5">
+    <summary><span class="tag">M5</span><span class="ttl">التشغيل المدمج والتحوّل</span><span class="count">0 / 7</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>ملف صوتي عام واحد متصل لكل درس، قابل للقفز وللربط العميق.</span></div>
+        <div><span class="lbl">الخروج</span><span>صوت مدمج لكل درس متعدّد الأجزاء مفرَّغ؛ والتشغيل والقفز مُتحقَّق منهما على الصيغة المعتمدة عبر مصفوفة الأجهزة.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>عامل الدمج: مسار سريع بدامج التسلسل، واحتياطي بإعادة الترميز إلى الصيغة المعتمدة، ودورة حياة حالة الدمج، والتزام ترتيب الكتابة</span></li>
+        <li><span></span><span>رفع الملف المدمج إلى الدلو العام، والتحذير إذا اختلف مجموع مدد الأجزاء عن مدة المدمج بأكثر من 500 مللي ثانية</span></li>
+        <li><span></span><span>توسيع أمر المصالحة ليشمل الصوت المدمج</span></li>
+        <li><span></span><span>المشغّل: تشغيل مدمج، وقفز إلى ناقص ثانيتين، وروابط <span class="k">?t=</span>، ومعالجة التشغيل التلقائي</span></li>
+        <li><span></span><span>إعادة نسبة المقاطع إلى الخط الزمني المدمج = إعادة فهرسة خالصة</span></li>
+      </ul>
+      <div class="subhead">التحوّل — مشروط بالتعادل: تغطية ≥ الإصدار الأول ونتائج إعادة التشغيل مساوية أو أفضل</div>
+      <ul class="tasks">
+        <li><span></span><span>تنفيذ فحص التعادل (فرق التغطية + إعادة تشغيل سجلات الاستعلامات) وتسجيل قرار المضيّ من عدمه</span></li>
+        <li><span></span><span>عند المضيّ: تحويل النطاق، وإضافة التحويلات، والإعلان — ويبقى الإصدار الأول حيًّا حتى تلك اللحظة</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="ms" id="m6">
+    <summary><span class="tag">M6</span><span class="ttl">واجهة المراجعة والمزامنة المستمرة</span><span class="count">0 / 4</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>بقاء الأرشيف محدَّثًا دون تشغيل يدوي، وقدرة البشر على تصحيح التجميع دون مصارعة المسار.</span></div>
+        <div><span class="lbl">الخروج</span><span>المؤقّتات تعمل أسبوعًا دون تدخّل؛ ودورة اعتماد ← إعادة توليد ← إعادة فهرسة مُتحقَّقة من طرفها إلى طرفها؛ ورسالة مصدر معدَّلة تخفّض درسها المعتمَد.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>واجهة المراجعة: طابور «بحاجة مراجعة» مرتّبًا بالثقة، مع معاينة وإعادة ترتيب وإضافة وحذف أجزاء وتقسيم ودمج وإعادة تسمية</span></li>
+        <li><span></span><span>مسار الاعتماد: اعتماد ← بصمة تركيب جديدة ← إعادة توليد في نطاق الدرس وحده (تفريغ الدرس، وإعادة الدمج، وإعادة الفهرسة)</span></li>
+        <li><span></span><span>مزامنة تدريجية على جلسة عادية: ما بعد آخر رسالة + إعادة فحص نحو 300 رسالة للتعديلات والحذف؛ والدروس المعتمَدة المتأثّرة تُخفَّض ولا تُعاد تركيبًا</span></li>
+        <li><span></span><span>مؤقّتات النظام تحت الأقفال: مزامنة كل 15 دقيقة ← تفريغ المعلّق ← فهرسة المعلّق؛ ودمج ليلي</span></li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="ms" id="m7">
+    <summary><span class="tag">M7</span><span class="ttl">التقسية وضبط الصلة</span><span class="count">0 / 6</span></summary>
+    <div class="inner">
+      <div class="goal">
+        <div><span class="lbl">الهدف</span><span>تشغيل مملّ بالمعنى الحسن: الإخفاقات ظاهرة، والتعافي مُدرَّب عليه، والبحث مضبوط على استعلامات حقيقية.</span></div>
+        <div><span class="lbl">الخروج</span><span>نجاح تمارين التعافي (نافذة الانهيار وإعادة الفهرسة من الصفر)؛ وصفحة العمليات تعمل؛ وتغييرات الصلة مقيسة مقابل مجموعة الانحدار.</span></div>
+      </div>
+      <ul class="tasks">
+        <li><span></span><span>صفحة العمليات: أعداد المراحل، والإخفاقات غير المحلولة، وحالة الأقفال، وسجل التشغيل (آخر تشغيلة ومدتها وأعدادها)، وحالة المزامنة لكل قناة</span></li>
+        <li><span></span><span>جدولة أمر المصالحة أسبوعيًا</span></li>
+        <li><span></span><span>أغلفة إعادة المحاولة على نداءات الشبكة وواجهات البرمجة، وتنظيف الملفات المؤقتة</span></li>
+        <li><span></span><span>الأمن: تحديد معدّل نقطة الروابط الموقّعة، وتدقيق أقل صلاحية للمفاتيح، ومفتاح البحث فقط في جانب المتصفّح</span></li>
+        <li><span></span><span>ضبط الصلة من السجلات الحقيقية: صور الهمزة، والتشكيل، والتسامح مع الأخطاء الإملائية العربية، ومدة المقطع، ووزن العنوان — ثم قرار ضمّ النص الخام إلى حقول البحث من عدمه</span></li>
+        <li><span></span><span>تمارين التعافي: القتل داخل نافذة الانهيار ثم التعافي، وإعادة الفهرسة من الصفر، وجولة استرجاع كاملة من R2</span></li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+<section id="freeze">
+  <h2><span class="num">§7</span> معايير التجميد</h2>
+  <p>ما تبقّى من غموض — انجراف صيغ العناوين عبر الحقب، ودقّة التجميع، وجودة التعرّف على الألفاظ العقدية والفقهية، ونسبة الزمن الحقيقي على البطاقة الفعلية، والتوزيع الواقعي للأنواع — لا يُحسم إلا ببيانات حقيقية. وأعلى المعالم قيمة هو الأرشيف الخام كاملًا في Convex وR2؛ ومتى صار دائمًا صار كل ما بعده قابلًا لإعادة الإنتاج.</p>
+  <div class="note stop"><b>لا وثائق معمارية بعد اليوم.</b> التغييرات من هنا التزامات برمجية (commits) يقودها عائق ملموس في بيانات حقيقية — لا جولة مراجعة أخرى.</div>
+</section>
+
+<section id="migration">
+  <h2><span class="num">§8</span> الهجرة من الإصدار الأول</h2>
+  <div class="rules">
+    <div class="rule"><div class="rn"></div><div><b>التصدير أولًا</b>التفريغات والتصحيحات وسجلات الاستعلامات وخريطة يوتيوب↔تيليجرام. و«الحذف» يعني الإسقاط من الفهرس الجديد، لا إتلاف البيانات.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>فرق التغطية بعد M1</b>ما وُجد على يوتيوب فقط يُحفظ كدرس بمصدر يوتيوب أو موروث؛ وإذا كان الفرق فارغًا جاز حذف تفريغات يوتيوب.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>تدقيق التصحيحات</b>التفريغات المصحّحة يدويًا تُستورد كتجاوزات — وهي البيانات الوحيدة التي لا يعوّضها أي حساب آلي.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>سجلات الاستعلامات</b>هي مجموعة انحدار الصلة في M4 وM7.</div></div>
+    <div class="rule"><div class="rn"></div><div><b>التحوّل بالتعادل بعد M5</b>تغطية ≥ الإصدار الأول ونتائج إعادة التشغيل مساوية أو أفضل ← تحويل النطاق والتحويلات والإعلان. ويبقى الإصدار الأول حيًّا حتى ذلك الحين.</div></div>
+  </div>
+</section>
+
+<section id="risks">
+  <h2><span class="num">§9</span> المخاطر ومعالجتها</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>الخطر</th><th>المعالجة</th></tr></thead>
+      <tbody>
+        <tr><td>حدود تيليجرام أو الحظر</td><td>حساب مخصّص، وTakeout، وتهدئة الإيقاع، ونقاط تفتيش قابلة للاستئناف</td></tr>
+        <tr><td>بطاقة رسوميات أبطأ من المرجع</td><td>قياس الأداء في M0 يحدّد الجدول؛ والمعمارية مستقلة عن السرعة</td></tr>
+        <tr><td>تصادم إعادة تشغيل المنظِّم مع التحرير اليدوي</td><td>قاعدة أسبقية التدخل اليدوي</td></tr>
+        <tr><td>بتر الكلام عند حدود الأجزاء</td><td>وصل المقاطع عبر الحدود، وإعادة تفريغ المدمج اختياريًا</td></tr>
+        <tr><td>طوابع زمنية تقريبية</td><td>القفز إلى ناقص ثانيتين، وعرض المقتطف</td></tr>
+        <tr><td>انجراف صيغ العناوين والتجميع عبر الحقب</td><td>محلّل ومجمّع بنُسخ، ودرجات ثقة، وطابور مراجعة، وإعادة تشغيل كامل مشروعة</td></tr>
+        <tr><td>ترميز غير مدعوم على iOS</td><td>بوابة الترميز في M0</td></tr>
+        <tr><td>انتهاء الرابط الموقّع أثناء الاستماع</td><td>أجزاء قصيرة وتجديد الرابط عند رفض الوصول</td></tr>
+        <tr><td>فقدان أصول الإصدار الأول</td><td>التصدير المسبق، وفرق التغطية بوابةً قبل أي حذف</td></tr>
+        <tr><td><b>دوّامة التخطيط</b></td><td><b>هذه الوثيقة مجمّدة؛ والمخرَج التالي شفرة تعمل</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="open">
+  <h2><span class="num">§10</span> بنود مفتوحة — لا تعطّل M0 ولا M1</h2>
+  <ul class="plain">
+    <li><b>موقع بطاقة الرسوميات</b> — جهاز مكتبي أم خادم؛ يؤثّر في شكل مؤقّتات M6 فقط.</li>
+    <li><b>نطاق التنزيل في M1</b> — قناتان، أم إضافة <span class="k">swteat_alkulife</span> و<span class="k">swteat_k</span> بينما يعمل المنزِّل؛ فالتنزيل ليس فهرسة.</li>
+    <li><b>ما يستحق الإنقاذ من الإصدار الأول</b> — هل من تفريغات مصحّحة يدويًا؟ وهل في نموذج البيانات حسابات أو علامات مرجعية أو تحليلات تستحق التصدير؟</li>
+  </ul>
+</section>
+
+<footer>
+  <span>مصدر التقرير: <span class="k">docs/telegram_archive_plan.md</span> · <span class="k">docs/tasks.md</span></span>
+  <span>الإصدار 2.2 — مجمّد</span>
+</footer>
+
+</main>
+</div>
+</div>

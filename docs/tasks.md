@@ -1,0 +1,139 @@
+# Telegram Knowledge Archive — Milestones & Tasks
+
+Derived from `docs/telegram_archive_plan.md` (v2.2, FROZEN). Milestone numbers mirror plan phases for traceability; § references point into the plan.
+
+## Sequencing
+
+M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7, with two allowed overlaps:
+
+- Start M1 the moment its M0 blockers are done (Telegram account, legacy export, Convex/R2 provisioning). The raw archive is irreplaceable and Telegram-rate-clocked; everything downstream is reproducible (§7).
+- M2 batches may start on partial archive data once the config is pinned and the GPU benchmark is done; M2 exit still requires M1 complete.
+
+Every batch command in every milestone obeys §4: R2-artifact-first write order, skip on `done`, crash-window recovery, stage locks + run history, failures drained first, `approved` lessons never recomposed.
+
+---
+
+## M0 — Foundations, gates, legacy export (Phase 0, ~½–1 day)
+
+**Goal:** every irreversible decision pinned, every external dependency proven, v1 data safe.
+**Exit:** `configHash` computed and logged; codec decision recorded; GPU benchmark numbers recorded and M2 schedule derived; legacy export verified in R2; transcribe doctor passes; Convex/R2/Meilisearch reachable with scoped keys.
+
+- [ ] Create dedicated Telegram account; store the SQLite `.session` file as a secret (never in git)
+- [ ] Accept HF model terms; set `HF_TOKEN`/`HF_HOME`; `cohere-transcribe-doctor --model-access` passes
+- [ ] Pin transcription config (model, modelRevision resolved branch→commit **once**, language=ar, vad, vadMerge, alignment) → canonical JSON → compute and log `configHash` before any inference; worker fails fast if the resolved default ever drifts from the pin (§0.5)
+- [ ] Benchmark the actual GPU: RTF, files/batch, VRAM → projected archive runtime; schedule M2 from measurement
+- [ ] Codec gate: Opus vs AAC seek/Range behavior on iOS Safari, Android, desktop; record the decision
+- [ ] Legacy export first: assoli-v1 transcripts, human corrections, query logs, YT↔TG map → `legacy/assoli-v1/` in R2; v1 stays live and untouched (§8.1)
+- [ ] Provision Convex: full schema (§2) plus the four atomic uniqueness mutations from day one (`getOrCreateMediaObject`, `upsertPartTranscript`, `upsertLessonByKey`, `acquirePipelineStage`)
+- [ ] Provision R2: private `telegram-archive` bucket, public `lessons-media` bucket + custom domain, scoped keys per bucket
+- [ ] Provision Meilisearch: instance, admin key, search-only key
+- [ ] Repo skeleton: Python project, config module holding the pinned config, `.gitignore` covering session file, secrets, temp dirs
+
+**Decisions to close (§10 — must not block M1):**
+- [ ] GPU location (desktop vs server) — shapes M6 timers only
+- [ ] M1 download scope: two channels, or also `swteat_alkulife` / `swteat_k` while the downloader runs (download ≠ index)
+- [ ] assoli-v1 salvage audit: any manually corrected transcripts? accounts/bookmarks/analytics worth exporting?
+
+---
+
+## M1 — Archive everything (Phase 1, Telegram-rate-clocked — start immediately)
+
+**Goal:** the complete raw archive — every message and every unique binary — durable in Convex + R2. Highest-value milestone in the project (§7).
+**Exit:** all in-scope channels fully synced; per-channel counts match channel stats; 20 random `telegramUrl` spot-checks pass; kill-and-resume proven clean.
+
+- [ ] Takeout session bootstrap: persist takeout id; handle `TakeoutInitDelay` and flood waits; chronological iteration; checkpoint per channel
+- [ ] Message ingest: structured upsert (`mediaType` set here, `semanticType` null) + raw dict appended to `meta/{channel}/{from:08d}-{to:08d}.jsonl.zst` + manifest (schemaVersion, range, count, createdAt, batch sha256)
+- [ ] Capture forward info, `grouped_id`, `replyToMessageId`, edit dates
+- [ ] Media pipeline per file: download → sha256 → `getOrCreateMediaObject` (repost = `messageMedia` row only) → ffprobe (durationMs, codec, sampleRate, channelCount) → upload `blobs/{sha256[:2]}/{sha256}.{ext}` → Convex rows → delete temp
+- [ ] Kill-safety test: kill mid-channel and mid-file, resume, verify no duplicate rows, no gaps, no orphan temp files
+- [ ] Validation pass: counts vs channel stats; 20 random `telegramUrl` spot-checks against live Telegram
+
+---
+
+## M2 — Transcribe all parts (Phase 2, GPU-clocked per M0 benchmark)
+
+**Goal:** a `done` part transcript for effectively every unique audio binary under the pinned config.
+**Exit:** ≥99% of unique audio sha256s have `partTranscripts.status = done` for the active `configHash`.
+
+- [ ] Batch-command harness (reused by all later stages): local `flock` + `acquirePipelineStage` (free, or heartbeat stale >5 min); 60 s heartbeat; on exit release lock and append a `pipelineRuns` row with counts (§4.5)
+- [ ] Failures-first drain: each run retries unresolved `failures` for its stage before new work; attempts capped, then surfaced (§4.6)
+- [ ] Selection: fast-path skip iff Convex record is `done` (§4.2); crash-window recovery for pending/stale-processing/failed/missing — compute deterministic expected key, `HEAD` R2, validate → promote to `done`, absent → process (§4.3); `existing="skip"` stays on as same-machine belt
+- [ ] Materialize needed blobs locally as `{sha256}.{ext}` (plain copy)
+- [ ] Persistent `Transcriber` (`language="ar"`, `vad_merge=True`, JSON out); batches of ~500 under the stage lock
+- [ ] Per file: upload `transcripts/{sha256}/{configHash}.json` → `upsertPartTranscript` done (write-order law §4.1); verify returned provenance matches pinned config — mismatch = failure, never a new identity
+- [ ] `reconcile-artifacts` command, part-transcript mode: Convex done + R2 missing → flag and mark for reprocessing; R2 exists + not done → validate and repair Convex; R2 orphan → report only, never auto-delete (§4.4)
+
+---
+
+## M3 — Organize + lesson transcripts (Phases 3 + 3.5)
+
+**Goal:** messages classified, articles extracted, lessons composed with stable identity, lesson-transcript artifacts built. Organizer is pure (reads Convex only) and fully re-runnable.
+**Exit:** a full Organizer re-run on unchanged data is a no-op; every lesson has a lesson-transcript artifact matching its current `assemblyHash` + active `configHash`; §8.2 coverage diff resolved.
+
+- [ ] Classifier v1 → `semanticType` + `classifierVersion`; forwarded audio flagged and excluded from sheikh-voice lessons by default
+- [ ] Article extraction → `articles` rows with `normalizedTitle`, `titleSource`
+- [ ] Series/title parser: all fields incl. `normalizedSeriesName`, parser version, confidence; test corpus of ≥50 real titles per channel per era
+- [ ] Grouping v1: grouped_id → title-then-consecutive-audio → replies → YouTube-link confirmation → time proximity as support; outputs grouping version, confidence, `reviewStatus` auto/needs_review
+- [ ] Compose: `upsertLessonByKey`; `assemblyHash` = canonical JSON of the ordered part sha256s only (§0.3); `lessonParts` with offsets accumulated from `mediaObjects.durationMs`
+- [ ] `lessonSources`: telegram primary row + youtube mirror row from trailing YouTube-link messages / v1 YT↔TG map
+- [ ] Enforce §0 amendment 1 / §4.7: reruns never touch `approved` lessons; a source-message edit/delete demotes `approved` → `needs_review`, never silent recompose
+- [ ] §8.2 coverage diff vs v1: YouTube-only items → `legacy`/`youtube` lessons via `lessonSources`; empty diff → delete v1 YouTube transcripts with a clear conscience
+- [ ] Lesson Transcript Builder (Phase 3.5): concat part JSONs + offsets → `lesson-transcripts/{lessonId}/{assemblyHash}-{configHash}.json` (organizerVersion recorded inside) → set pointer; regenerates automatically whenever `assemblyHash` changes
+
+---
+
+## M4 — Search v0 beta (Phase 4, runs alongside live v1)
+
+**Goal:** searchable articles + audio chunks behind a usable RTL UI.
+**Exit:** v1 query-log replay against both v1 and v2 produces a recorded relevance comparison (the regression set for M7).
+
+- [ ] Chunk builder: 45–90 s chunks from lesson-transcript artifacts; deterministic IDs; part-N tails always joined with part-N+1 heads (§5); part-level fallback for ungrouped audio
+- [ ] Meilisearch `articles` + `audio_chunks`: searchable `normalizedTitle`/`normalizedText`; displayed `title`/`text`; filters `channel`, `seriesName`, `lessonId`; sort `date`
+- [ ] Full `reindex` from scratch proven; `indexedAt`/`indexVersion` stamped
+- [ ] Import v1 manual corrections as transcript overrides (§8.3) — the only data no GPU can reproduce
+- [ ] UI: RTL, articles/audio tabs, excerpts, series facets, Telegram links
+- [ ] Raw-part playback via short-lived signed R2 URLs (Range OK; refresh on 403); raw bucket stays private forever
+- [ ] Relevance baseline: replay v1 query logs against v1 and v2; record results (§8.4)
+
+---
+
+## M5 — Merged playback (Phase 5)
+
+**Goal:** one continuous public audio file per lesson, seekable and deep-linkable.
+**Exit:** merged audio exists for all transcribed multi-part lessons; playback and seek verified on the gated codec across the M0 device matrix.
+
+- [ ] Merge worker: concat-demuxer fast path, re-encode fallback to the M0-gated codec; `mergeStatus` lifecycle; write-order law
+- [ ] Upload `lessons/{lessonId}/{mergedSha256}.{ext}` to the public bucket; warn when Σ part durations vs merged duration differs by >500 ms
+- [ ] Extend `reconcile-artifacts` to merged audio
+- [ ] Player: merged playback, seek `max(0, startMs − 2000)`, `?t=` links, autoplay handling
+- [ ] Chunk re-attribution to the merged timeline = pure reindex
+
+**Cutover (gated by §8.5 — only when coverage ≥ v1 AND log-replay equal-or-better):**
+- [ ] Run the parity check (coverage diff + query-log replay); record go/no-go
+- [ ] On go: switch domain, add redirects, sheikh announcement; v1 stays live until then
+
+---
+
+## M6 — Review UI & continuous sync (Phase 6)
+
+**Goal:** the archive stays current without manual runs; humans can fix grouping without fighting the pipeline.
+**Exit:** timers running unattended for a week; one approve → regen → reindex cycle verified end-to-end; an edited source message demotes its approved lesson.
+
+- [ ] Review UI: `needs_review` queue ordered by confidence; preview, reorder, add/remove parts, split, merge, rename
+- [ ] Approve flow: approve → new `assemblyHash` → lesson-scoped regen (lesson transcript + remerge + reindex)
+- [ ] Incremental sync on a normal session: messages > `lastMessageId` + ~300-message recheck for edits/`deletedAt`; affected `approved` lessons demote to `needs_review` (§4.7), never recompose
+- [ ] systemd timers under §4.5 locks: sync every 15 min → transcribe-pending → index-pending; merge nightly
+
+---
+
+## M7 — Hardening & relevance (Phase 7)
+
+**Goal:** boring operations — failures visible, recovery drilled, search tuned on real queries.
+**Exit:** recovery drills pass (§4.3 crash window, reindex-from-scratch); ops page live; relevance changes measured against the §8.4 regression set.
+
+- [ ] Ops page: stage counts, unresolved `failures`, `pipelineLocks` state, `pipelineRuns` history (last run, duration, counts), per-channel sync status
+- [ ] Schedule `reconcile-artifacts` weekly
+- [ ] Retry wrappers on network/API calls; temp cleanup
+- [ ] Security: rate-limit the signed-URL endpoint; least-privilege key audit; search-only Meilisearch key client-side
+- [ ] Relevance tuning from v1 logs: hamza/diacritics variants, Arabic typo tolerance, chunk duration, title weight; then decide whether raw `text` joins the searchable fields
+- [ ] Recovery drills: kill inside the §4.3 crash window and recover; reindex from scratch; restore-from-R2 walkthrough
