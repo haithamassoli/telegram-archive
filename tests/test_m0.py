@@ -64,6 +64,21 @@ def test_transcriber_kwargs_cover_the_pin():
     assert kwargs["language"] == "ar" and kwargs["vad_merge"] is True
 
 
+def test_load_env_strips_the_convex_trailing_comment():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / ".env.local"
+        path.write_text(
+            "# Deployment used by `npx convex dev`\n"
+            "CONVEX_DEPLOYMENT=dev:effervescent-mandrill-509 # team: x, project: y\n"
+            "CONVEX_URL=https://effervescent-mandrill-509.eu-west-1.convex.cloud\n"
+        )
+        for key in ("CONVEX_DEPLOYMENT", "CONVEX_URL"):
+            os.environ.pop(key, None)
+        config.load_env(path)
+        assert os.environ["CONVEX_DEPLOYMENT"] == "dev:effervescent-mandrill-509"
+        assert os.environ["CONVEX_URL"].endswith(".convex.cloud")
+
+
 def test_load_env_parses_and_never_overrides_the_shell():
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / ".env"

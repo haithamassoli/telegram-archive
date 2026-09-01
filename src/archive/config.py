@@ -68,13 +68,22 @@ def check_revision_drift() -> tuple[bool, str]:
     return True, "package default matches the pin"
 
 
-def load_env(path: Path | None = None) -> None:
-    """Load KEY=VALUE lines from .env into os.environ without overriding the shell.
+# .env.local is written by `npx convex dev` and holds CONVEX_URL; it is read
+# first so the deployment the CLI selected is the one this code talks to.
+ENV_FILES = (".env.local", ".env")
 
-    ponytail: 10-line parser instead of python-dotenv; this file is ours and
-    holds plain secrets. Swap in python-dotenv if it ever needs multiline values.
+
+def load_env(path: Path | None = None) -> None:
+    """Load KEY=VALUE lines from .env.local/.env without overriding the shell.
+
+    ponytail: 12-line parser instead of python-dotenv; these files are ours and
+    hold plain secrets. Swap in python-dotenv if it ever needs multiline values.
     """
-    env_path = REPO_ROOT / ".env" if path is None else path
+    if path is None:
+        for name in ENV_FILES:
+            load_env(REPO_ROOT / name)
+        return
+    env_path = path
     if not env_path.is_file():
         return
     for raw in env_path.read_text(encoding="utf-8").splitlines():
@@ -86,7 +95,8 @@ def load_env(path: Path | None = None) -> None:
         if not sep:
             continue
         key = key.strip()
-        value = value.strip()
+        # `npx convex dev` writes trailing "# team: ..." comments on its values.
+        value = value.split(" #", 1)[0].strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
         os.environ.setdefault(key, value)

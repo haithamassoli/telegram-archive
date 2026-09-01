@@ -18,13 +18,13 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 **Goal:** every irreversible decision pinned, every external dependency proven, v1 data safe.
 **Exit:** `configHash` computed and logged; codec decision recorded; GPU benchmark numbers recorded and M2 schedule derived; legacy export verified in R2; transcribe doctor passes; Convex/R2/Meilisearch reachable with scoped keys.
 
-- [ ] Create dedicated Telegram account; store the SQLite `.session` file as a secret (never in git)
+- [ ] Create dedicated Telegram account; store the SQLite `.session` file as a secret (never in git) — API app registered (`TELEGRAM_API_ID`/`TELEGRAM_API_HASH` in `.env`); session file created at first login in M1
 - [x] Accept HF model terms; set `HF_TOKEN`/`HF_HOME` — verified by the `model-access` gate (pinned model+revision readable with the token)
 - [x] Pin transcription config → `src/archive/config.py`; `configHash=d27d1fb0a633fb8273f793655bd8ef82e6100da90f63340d1f9bb16c609bc4d5`, recorded in `m0.gates.json`; drift from the pin or from the package default fails the `config-pin` gate (§0.5)
 - [ ] Benchmark the actual GPU: RTF, files/batch, VRAM → projected archive runtime; schedule M2 from measurement — run `archive bench <audio...> --archive-hours N` (writes `m0.gates.json`)
 - [ ] Codec gate: Opus vs AAC seek/Range behavior on iOS Safari, Android, desktop — record `decision` + `testedOn` in `m0.gates.json`
 - [ ] Legacy export first: assoli-v1 transcripts, human corrections, query logs, YT↔TG map → `legacy/assoli-v1/` in R2; v1 stays live and untouched (§8.1) — tool ready: `archive legacy-export <dir>` (resumable, manifest + verification); needs the v1 export dir and working R2 keys
-- [ ] Provision Convex — schema (§2) and all four atomic mutations written and typechecked in `convex/`; remaining: `npx convex dev` to create the deployment and set `CONVEX_URL`
+- [x] Provision Convex — schema (§2) + the four atomic mutations (plus lock heartbeat/release) deployed to `haitham-assoli:alkulify` dev (`effervescent-mandrill-509`); uniqueness, lock hand-off, attempt counting and merge invalidation exercised against the live deployment
 - [ ] Provision R2: private `telegram-archive` bucket, public `lessons-media` bucket + custom domain, scoped keys per bucket — `.env` currently holds placeholder keys (10 chars); the `r2` gate checks reachability
 - [ ] Provision Meilisearch: instance, admin key, search-only key
 - [x] Repo skeleton: Python project (`src/archive/`), config module holding the pinned config, `.gitignore` covering `.env`, `*.session`, `secrets/`, temp dirs; `tests/test_m0.py`

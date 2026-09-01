@@ -19,9 +19,13 @@ cohere-transcribe/  vendored ASR package (M2)
 uv sync                       # python deps
 npm install                   # convex + typescript
 cp .env.example .env          # then fill in the real values
+npx convex dev                # writes .env.local, deploys the schema
 ```
 
-`.env` holds every secret; it is gitignored, as is the Telegram `.session` file.
+`.env` holds every secret and `.env.local` holds the Convex deployment the CLI
+selected; both are gitignored, as is the Telegram `.session` file. The Python
+code reads `.env.local` first, so it always talks to the deployment `npx convex`
+is pointed at.
 
 ## Commands
 
@@ -43,9 +47,12 @@ in R2 and Convex. **Changing any of them re-transcribes the whole archive.**
 
 ## Convex
 
+Deployed to the `alkulify` project's dev deployment.
+
 ```sh
-npx convex dev      # creates the deployment, generates convex/_generated, deploys schema
+npx convex dev      # generates convex/_generated, deploys schema + mutations
 npm run typecheck   # tsc over convex/
+npx convex dashboard
 ```
 
 Convex indexes are not `UNIQUE` constraints. Uniqueness on `sha256`,
