@@ -14,10 +14,14 @@ from __future__ import annotations
 import io
 import json
 import re
+import sqlite3
 import sys
+import tempfile
+import types
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -692,6 +696,38 @@ def main() -> int:
             traceback.print_exc()
     print(f"\n{len(tests) - failed} passed, {failed} failed")
     return 1 if failed else 0
+
+
+def test_a_takeout_id_survives_a_session_round_trip():
+    """Telethon 1.44.0 cannot read back a session row it wrote with a takeout
+    open; `_detach_takeout_id` is what keeps the session file loadable."""
+    from telethon.sessions import SQLiteSession
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "t.session"
+        SQLiteSession(str(path)).close()  # a real, empty session file
+        with sqlite3.connect(path) as db:
+            db.execute("update sessions set takeout_id = 2894902766039227874")
+
+        try:
+            SQLiteSession(str(path))
+            raise AssertionError("expected stock Telethon to choke on the row")
+        except TypeError:
+            pass
+
+        with mock.patch.object(ingest.telegram, "session_path", lambda: path):
+            assert ingest._detach_takeout_id(path) == 2894902766039227874
+            SQLiteSession(str(path)).close()  # loads again
+            assert ingest._takeout_file().read_text() == "2894902766039227874"
+
+            client = types.SimpleNamespace(session=ingest._session())
+            assert ingest._takeout_id(client) == 2894902766039227874
+            client.session.save()
+            client.session.close()
+            # ...and the id still never reaches the column that cannot hold it.
+            with sqlite3.connect(path) as db:
+                assert db.execute("select takeout_id from sessions").fetchone()[0] is None
+            SQLiteSession(str(path)).close()
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sqlite3
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -466,20 +467,82 @@ def sync_channel(
     return {"channel": username, "fetched": seen, "channelId": channel_id}
 
 
-def _takeout_id(client) -> int | None:
-    """The live takeout id in the session, or None.
+def _takeout_file() -> Path:
+    """Where the takeout id lives, next to the session it belongs to."""
+    return telegram.session_path().with_suffix(".takeout")
 
-    A session created before any takeout stores `b''` in that column rather than
-    NULL, and Telethon compares it with `is None` — so it thinks a takeout is
-    open, refuses to start one, and then fails packing the empty bytes as an
-    int64. Normalise it once, here.
+
+def _detach_takeout_id(path: Path) -> int | None:
+    """Move a takeout id stock Telethon wrote into the session file out of it.
+
+    Telethon 1.44.0 writes the sessions row in schema order
+    (auth_key, takeout_id, tmp_auth_key) but unpacks it as
+    (auth_key, tmp_auth_key, takeout_id) — so an open takeout's id is handed to
+    `AuthKey()` on the next open and the session file stops loading at all.
+    Returns the id that was rescued, if any.
+    """
+    if not path.exists():
+        return None
+    with sqlite3.connect(path) as db:
+        row = db.execute("select takeout_id from sessions").fetchone()
+        if row is None or not isinstance(row[0], int):
+            return None
+        db.execute("update sessions set takeout_id = null")
+    sidecar = _takeout_file()
+    if not sidecar.exists():
+        sidecar.write_text(str(row[0]))
+        sidecar.chmod(0o600)
+    return row[0]
+
+
+def _session():
+    """The session file, with the takeout id kept out of it.
+
+    ponytail: a sidecar file instead of the session column, because the column
+    cannot survive a round-trip through Telethon 1.44.0 (see
+    `_detach_takeout_id`). Delete all of this once Telethon reads its own row
+    back in the order it wrote it.
+    """
+    from telethon.sessions import SQLiteSession
+
+    path = telegram.session_path()
+    _detach_takeout_id(path)
+
+    class _Session(SQLiteSession):
+        def _update_session_table(self):
+            keep, self._takeout_id = self._takeout_id, None
+            try:
+                super()._update_session_table()
+            finally:
+                self._takeout_id = keep
+
+    return _Session(str(path))
+
+
+def _takeout_id(client) -> int | None:
+    """The live takeout id, loaded from the sidecar the first time it is asked.
+
+    A session that never held a takeout stores `b''` rather than NULL, and
+    Telethon compares it with `is None` — so it thinks a takeout is open,
+    refuses to start one, and then fails packing the empty bytes as an int64.
+    Anything that is not an int is normalised away here.
     """
     value = getattr(client.session, "takeout_id", None)
     if isinstance(value, int):
         return value
-    if value is not None:
-        client.session.takeout_id = None
-    return None
+    sidecar = _takeout_file()
+    stored = int(sidecar.read_text().strip()) if sidecar.exists() else None
+    client.session.takeout_id = stored
+    return stored
+
+
+def _store_takeout_id(client) -> None:
+    """Persist the id Telethon just got, so the next run resumes this takeout."""
+    value = getattr(client.session, "takeout_id", None)
+    if isinstance(value, int):
+        sidecar = _takeout_file()
+        sidecar.write_text(str(value))
+        sidecar.chmod(0o600)
 
 
 def _finish_takeout(client) -> bool:
@@ -500,6 +563,7 @@ def _finish_takeout(client) -> bool:
         )
     )
     client.session.takeout_id = None
+    _takeout_file().unlink(missing_ok=True)
     return True
 
 
@@ -519,7 +583,7 @@ def open_client(takeout: bool, reset_takeout: bool = False):
 
     creds = require_env("TELEGRAM_API_ID", "TELEGRAM_API_HASH")
     client = TelegramClient(
-        str(telegram.session_path()),
+        _session(),
         int(creds["TELEGRAM_API_ID"]),
         creds["TELEGRAM_API_HASH"],
     )
@@ -543,6 +607,7 @@ def open_client(takeout: bool, reset_takeout: bool = False):
         else:
             worker = client.takeout(finalize=False)
         worker.__enter__()
+        _store_takeout_id(client)
     except TakeoutInitDelayError as exc:
         client.disconnect()
         raise RuntimeError(

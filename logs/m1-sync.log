@@ -1,0 +1,30 @@
+Traceback (most recent call last):
+  File "/Users/goldentik/Documents/telegram-archive/.venv/bin/archive", line 10, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/src/archive/cli.py", line 236, in main
+    return args.func(args)
+           ^^^^^^^^^^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/src/archive/cli.py", line 131, in cmd_sync
+    results = ingest.sync(
+              ^^^^^^^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/src/archive/ingest.py", line 579, in sync
+    client, worker = open_client(takeout, reset_takeout=reset_takeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/src/archive/ingest.py", line 521, in open_client
+    client = TelegramClient(
+             ^^^^^^^^^^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/.venv/lib/python3.11/site-packages/telethon/client/telegrambaseclient.py", line 297, in __init__
+    session = SQLiteSession(str(session))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/.venv/lib/python3.11/site-packages/telethon/sessions/sqlite.py", line 68, in __init__
+    self._tmp_auth_key = AuthKey(data=tmp_key)
+                         ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/.venv/lib/python3.11/site-packages/telethon/crypto/authkey.py", line 21, in __init__
+    self.key = data
+    ^^^^^^^^
+  File "/Users/goldentik/Documents/telegram-archive/.venv/lib/python3.11/site-packages/telethon/crypto/authkey.py", line 39, in key
+    with BinaryReader(sha1(self._key).digest()) as reader:
+                      ^^^^^^^^^^^^^^^
+TypeError: object supporting the buffer API required
+alkulife: resuming after message 0
