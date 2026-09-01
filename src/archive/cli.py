@@ -7,8 +7,8 @@ import json
 import sys
 from pathlib import Path
 
-from . import gates, legacy, telegram
-from .config import CONFIG_HASH, PINNED_CONFIG, canonical_json
+from . import gates, ingest, legacy, telegram, verify
+from .config import CONFIG_HASH, M1_CHANNELS, PINNED_CONFIG, canonical_json
 
 STATUS_MARK = {"pass": "PASS", "fail": "FAIL", "pending": "PEND"}
 
@@ -122,6 +122,50 @@ def cmd_bench(args) -> int:
     return 0
 
 
+def cmd_sync(args) -> int:
+    """M1: archive every in-scope channel, resumable, from its checkpoint on."""
+    from .pipeline import StageBusy
+
+    channels = args.channels or list(M1_CHANNELS)
+    try:
+        results = ingest.sync(
+            channels,
+            limit=args.limit,
+            takeout=not args.no_takeout,
+            reset_takeout=args.reset_takeout,
+            batch_size=args.batch_size,
+        )
+    except StageBusy as exc:
+        print(f"not started: {exc}")
+        return 1
+    for row in results:
+        print(f"{row['channel']}: {row['fetched']} message(s) this run")
+    return 0
+
+
+def cmd_verify_archive(args) -> int:
+    """M1 exit criteria: counts vs the channel, and live telegramUrl spot-checks."""
+    channels = args.channels or list(M1_CHANNELS)
+    failed = False
+    for report in verify.verify(channels, checks=args.checks):
+        spots = report["spotChecks"]
+        bad = report["spotFailures"]
+        print(
+            f"{report['channel']}: {report['archived']}/{report['liveTotal']} archived "
+            f"({report['withMedia']} with media), checkpoint {report['checkpoint']}, "
+            f"{report['metaBatches']} meta batch(es) covering "
+            f"{report['metaMessages']}, {report['idGaps']} id gap(s)"
+        )
+        print(f"  spot-checks: {len(spots) - len(bad)}/{len(spots)} clean")
+        for entry in bad:
+            print(f"  !! {entry['url']}: {', '.join(entry['problems'])}")
+        for key in report["missingBatches"]:
+            print(f"  !! meta batch missing from R2: {key}")
+        if bad or report["missingBatches"] or report["archived"] < report["liveTotal"]:
+            failed = True
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="archive")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -158,6 +202,35 @@ def main(argv: list[str] | None = None) -> int:
         help="total archive audio hours, for the runtime projection",
     )
     bench.set_defaults(func=cmd_bench)
+
+    sync = sub.add_parser("sync", help="M1: archive channels into Convex + R2")
+    sync.add_argument(
+        "channels",
+        nargs="*",
+        help=f"channel usernames (default: {' '.join(M1_CHANNELS)})",
+    )
+    sync.add_argument("--limit", type=int, help="stop after N messages per channel")
+    sync.add_argument(
+        "--batch-size", type=int, default=ingest.BATCH, help="messages per meta batch"
+    )
+    sync.add_argument(
+        "--reset-takeout",
+        action="store_true",
+        help="close the takeout id stored in the session and open a fresh one",
+    )
+    sync.add_argument(
+        "--no-takeout",
+        action="store_true",
+        help="iterate on the normal session instead of a takeout export",
+    )
+    sync.set_defaults(func=cmd_sync)
+
+    check = sub.add_parser("verify-archive", help="M1 exit criteria for the archive")
+    check.add_argument("channels", nargs="*", help="channel usernames")
+    check.add_argument(
+        "--checks", type=int, default=verify.SPOT_CHECKS, help="random spot-checks"
+    )
+    check.set_defaults(func=cmd_verify_archive)
 
     args = parser.parse_args(argv)
     return args.func(args)

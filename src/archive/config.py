@@ -36,6 +36,11 @@ def config_hash(config: dict[str, object] | None = None) -> str:
 
 CONFIG_HASH = config_hash()
 
+# M1 download scope, closed in docs/tasks.md: these two channels and no others.
+# The remaining three (~929 messages) cost a second Telegram-clocked pass if
+# they are ever added.
+M1_CHANNELS = ("alkulife", "doros_alkulify")
+
 
 def transcriber_kwargs() -> dict[str, object]:
     """The pinned config as cohere-transcribe keyword arguments."""

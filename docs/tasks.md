@@ -52,14 +52,14 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 **Goal:** the complete raw archive — every message and every unique binary — durable in Convex + R2. Highest-value milestone in the project (§7).
 **Exit:** all in-scope channels fully synced; per-channel counts match channel stats; 20 random `telegramUrl` spot-checks pass; kill-and-resume proven clean.
 
-- [ ] Takeout session bootstrap: persist takeout id; handle `TakeoutInitDelay` and flood waits; chronological iteration; checkpoint per channel
-- [ ] Message ingest: structured upsert (`mediaType` set here, `semanticType` null) + raw dict appended to `meta/{channel}/{from:08d}-{to:08d}.jsonl.zst` + manifest (schemaVersion, range, count, createdAt, batch sha256)
-- [ ] Capture forward info, `grouped_id`, `replyToMessageId`, edit dates
-- [ ] Media pipeline per file: download → sha256 → `getOrCreateMediaObject` (repost = `messageMedia` row only) → ffprobe (durationMs, codec, sampleRate, channelCount) → upload `blobs/{sha256[:2]}/{sha256}.{ext}` → Convex rows → delete temp
-- [ ] Kill-safety test: kill mid-channel and mid-file, resume, verify no duplicate rows, no gaps, no orphan temp files
-- [ ] Validation pass: counts vs channel stats; 20 random `telegramUrl` spot-checks against live Telegram
-
----
+- [x] Takeout session bootstrap: takeout id persisted in the session (`finalize=False`, so a resumed run continues the same export); `TakeoutInitDelay` reported with the wait; flood waits slept through (`flood_sleep_threshold = 24h`); chronological iteration; checkpoint per channel in `channels.lastMessageId`. `--reset-takeout` closes a stored id, `--no-takeout` falls back to the normal session. **Telegram currently answers the takeout request with a 24 h delay — it has to be approved in the Telegram app before the paced run can start.**
+- [x] Message ingest: `upsertTelegramMessage` (uniqueness on `(channelId, telegramMessageId)`, `mediaType` set here, `semanticType` left null and never clobbered on re-ingest) + raw dict appended to `meta/{channel}/{from:08d}-{to:08d}.jsonl.zst` + `meta/{channel}/manifest.json` (schemaVersion, range, count, createdAt, per-batch sha256)
+- [x] Capture forward info, `grouped_id` (as a string — it is an int64), `replyToMessageId`, edit dates
+- [x] Media pipeline per file: download → sha256 → existing-row lookup (a repost reuses that row's `r2Key`, so identical bytes can never land under two keys) → ffprobe (durationMs, codec, sampleRate, channelCount) → upload `blobs/{sha256[:2]}/{sha256}.{ext}` → `getOrCreateMediaObject` + `linkMessageMedia` → delete temp. R2 before Convex (§4.1)
+- [x] §4.5 batch harness (built here, reused by every later stage): local `flock` + `acquirePipelineStage`, 60 s heartbeat, `pipelineRuns` row with counts on every exit path. §4.6 failure drain: a failed message goes to `failures`, and the next run retries it before new work, capped at 5 attempts
+- [x] Kill-safety test: proven twice. Against fakes — `tests/test_m1.py` kills mid-channel and mid-file and asserts no duplicate rows, no gaps, no orphan temp files. Against the live channel — `SIGKILL` mid-download of message 18 left a 19 MB partial; the second run was correctly refused by the Convex stage lock, and after the 5-minute stale window the recovered run wiped the temp dir, skipped messages 14–16 with zero re-downloads, and re-fetched only 18
+- [x] Validation pass: `archive verify-archive` — archived count vs the channel's own total, id-gap count, meta-batch presence in R2, and N random `telegramUrl` spot-checks re-fetched from live Telegram (url, date, mediaType, text). 17/17 clean on the synced slice
+- [ ] **Run it to completion.** 17 of 26,686 in-scope messages are archived (`doros_alkulify` 1–18, 882 MB). Mean audio blob so far is ~68 MB, so the full scope is on the order of hundreds of GB and several days of Telegram-clocked downloading — and per the M0 decision above it runs on the owner's personal account. Start with `archive sync` once the takeout is approved in the Telegram app.
 
 ## M2 — Transcribe all parts (Phase 2, GPU-clocked per M0 benchmark)
 

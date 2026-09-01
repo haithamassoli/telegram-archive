@@ -27,3 +27,7 @@ convex/_generated/
 
 .env.local
 .env.local
+
+# M1 runtime scratch: stage locks and the media temp dir (§4.5)
+.locks/
+.tmp/

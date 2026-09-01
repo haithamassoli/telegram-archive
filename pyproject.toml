@@ -3,7 +3,9 @@ name = "telegram-archive"
 version = "0.1.0"
 description = "Telegram Knowledge Archive pipeline"
 requires-python = ">=3.11"
-dependencies = ["boto3", "telethon"]
+# zstandard: the meta batches are .jsonl.zst per plan §3, and the stdlib
+# only ships zstd from Python 3.14 (this project runs on 3.11).
+dependencies = ["boto3", "telethon", "zstandard"]
 
 [project.scripts]
 archive = "archive.cli:main"

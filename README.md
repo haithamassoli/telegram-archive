@@ -35,7 +35,30 @@ archive gates                                # every M0 exit gate; exit 1 until 
 archive legacy-export <dir>                  # assoli-v1 export dir -> R2 legacy/assoli-v1/
 archive telegram-login                       # interactive first login (needs a real terminal)
 archive bench <audio...> --archive-hours 900 # GPU benchmark -> m0.gates.json
+archive sync                                 # M1: archive the in-scope channels
+archive verify-archive                       # M1 exit criteria; exit 1 until met
 ```
+
+## M1 — the archive (`archive sync`)
+
+Resumable by construction. `channels.lastMessageId` is a high-water mark advanced
+only after that batch's `.jsonl.zst` is in R2, so a kill costs at most one batch
+of replay — and replayed messages that are already complete cost one Convex read
+instead of a re-download. Binaries are keyed by sha256, so a repost adds a
+`messageMedia` row and nothing else.
+
+```sh
+archive sync                          # every channel in config.M1_CHANNELS
+archive sync alkulife --limit 500     # one channel, bounded
+archive sync --no-takeout             # normal session instead of a takeout export
+archive sync --reset-takeout          # close the takeout id stored in the session
+```
+
+Telegram grants a takeout export higher limits, but only after the request is
+approved in the Telegram app — until then it answers with a 24-hour delay and
+`archive sync` says so. One run per stage at a time: a local `flock` plus the
+`pipelineLocks` row, whose heartbeat has to go stale (5 min) before another
+machine can take over.
 
 ## The pinned config (§0.5)
 
