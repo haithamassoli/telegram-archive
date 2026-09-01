@@ -18,7 +18,7 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 **Goal:** every irreversible decision pinned, every external dependency proven, v1 data safe.
 **Exit:** `configHash` computed and logged; codec decision recorded; GPU benchmark numbers recorded and M2 schedule derived; legacy export verified in R2; transcribe doctor passes; Convex/R2/Meilisearch reachable with scoped keys.
 
-- [ ] Create dedicated Telegram account; store the SQLite `.session` file as a secret (never in git) — API app registered (`TELEGRAM_API_ID`/`TELEGRAM_API_HASH` in `.env`); run `archive telegram-login` on the dedicated account. The gate asks Telegram whether the session is signed in, because Telethon writes a complete-looking session file during the key exchange before it prompts for a phone
+- [x] Telegram access — **decided: archiving runs on the personal account `@haithamassoli`, not a dedicated one.** The §9 mitigation for "Telegram limits/ban" is therefore not in place: a ban during M1 would cost the owner's own account rather than a throwaway. The rest of that mitigation still applies (takeout, pacing, resumable checkpoints), and the archive stays resumable either way. Session at `secrets/archive.session` (mode 600, gitignored), created by `archive telegram-login`; the gate asks Telegram whether it is really signed in, because Telethon writes a complete-looking session file during the key exchange, before it prompts for a phone.
 - [x] Accept HF model terms; set `HF_TOKEN`/`HF_HOME` — verified by the `model-access` gate (pinned model+revision readable with the token)
 - [x] Pin transcription config → `src/archive/config.py`; `configHash=d27d1fb0a633fb8273f793655bd8ef82e6100da90f63340d1f9bb16c609bc4d5`, recorded in `m0.gates.json`; drift from the pin or from the package default fails the `config-pin` gate (§0.5)
 - [ ] Benchmark the actual GPU: RTF, files/batch, VRAM → projected archive runtime; schedule M2 from measurement — run `archive bench <audio...> --archive-hours N` (writes `m0.gates.json`)
@@ -33,7 +33,16 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 
 **Decisions to close (§10 — must not block M1):**
 - [ ] GPU location (desktop vs server) — shapes M6 timers only
-- [ ] M1 download scope: two channels, or also `doros_alkulify` / `alkulife` while the downloader runs (download ≠ index)
+- [ ] M1 download scope — resolved on the live account, counts as of 2026-09-01:
+  | channel | msgs | range | title |
+  |---|---|---|---|
+  | `@doros_alkulify` | 11,899 | 2017-09-08 → 2026-09-01 | المواد الصوتية / عبد الله الخليفي |
+  | `@alkulife` | 14,787 | 2017-05-10 → 2026-08-31 | قناة \| أبي جعفر عبدالله الخليفي |
+  | `@T_alkulife` | 904 | 2022-09-10 → 2026-03-31 | تدبرات قرآنية |
+  | `@alkulifyfgh` | 16 | 2024-10-14 → 2026-03-16 | الفقه سؤال وجواب |
+  | `@KulifyAntiCapitalism` | 9 | 2022-12-25 → 2025-10-02 | نقد الرأسمالية / الخليفي |
+
+  The two primary channels are `@doros_alkulify` (audio) and `@alkulife`. The other three add 929 messages — under 3.5% — so downloading them costs almost nothing and avoids a second Telegram-clocked pass. Download ≠ index. Owner to confirm.
 - [ ] assoli-v1 salvage audit: any manually corrected transcripts? accounts/bookmarks/analytics worth exporting?
 
 ---
