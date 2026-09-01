@@ -24,7 +24,7 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 - [ ] Benchmark the actual GPU: RTF, files/batch, VRAM → projected archive runtime; schedule M2 from measurement — run `archive bench <audio...> --archive-hours N` (writes `m0.gates.json`)
 - [ ] Codec gate: Opus vs AAC seek/Range behavior on iOS Safari, Android, desktop — record `decision` + `testedOn` in `m0.gates.json`
 - [ ] Legacy export first: assoli-v1 transcripts, human corrections, query logs, YT↔TG map → `legacy/assoli-v1/` in R2; v1 stays live and untouched (§8.1) — tool ready: `archive legacy-export <dir>` (resumable, manifest + verification); needs the v1 export dir and working R2 keys
-- [x] Provision Convex — schema (§2) + the four atomic mutations (plus lock heartbeat/release) deployed to `haitham-assoli:alkulify` dev (`effervescent-mandrill-509`); uniqueness, lock hand-off, attempt counting and merge invalidation exercised against the live deployment
+- [x] Provision Convex — schema (§2) + the four atomic mutations (plus lock heartbeat/release) deployed to `haitham-assoli:alkulify` dev (`friendly-cheetah-400`); uniqueness, lock hand-off, attempt counting and merge invalidation exercised against the live deployment
 - [ ] Provision R2: private `telegram-archive` bucket, public `lessons-media` bucket + custom domain, scoped keys per bucket — `.env` currently holds placeholder keys (10 chars); the `r2` gate checks reachability
 - [ ] Provision Meilisearch: instance, admin key, search-only key
 - [x] Repo skeleton: Python project (`src/archive/`), config module holding the pinned config, `.gitignore` covering `.env`, `*.session`, `secrets/`, temp dirs; `tests/test_m0.py`
