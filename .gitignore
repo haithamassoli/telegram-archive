@@ -24,3 +24,5 @@ temp/
 
 # convex codegen output (npx convex dev regenerates)
 convex/_generated/
+
+.env.local
