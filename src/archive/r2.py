@@ -41,6 +41,21 @@ def head(s3, bucket_name: str, key: str) -> dict | None:
         raise
 
 
+def list_keys(s3, bucket_name: str, prefix: str) -> set[str]:
+    """Every key under `prefix`, as one paginated LIST instead of a HEAD per key."""
+    keys: set[str] = set()
+    token = None
+    while True:
+        kwargs = {"Bucket": bucket_name, "Prefix": prefix}
+        if token:
+            kwargs["ContinuationToken"] = token
+        page = s3.list_objects_v2(**kwargs)
+        keys.update(item["Key"] for item in page.get("Contents", []))
+        if not page.get("IsTruncated"):
+            return keys
+        token = page["NextContinuationToken"]
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:

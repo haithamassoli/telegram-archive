@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from archive import cli, config, gates, legacy
+from archive import cli, config, gates, legacy, r2
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -129,6 +129,17 @@ class FakeS3:
 
         return {"Body": io.BytesIO(self.objects[Key]["Body"])}
 
+    # Pages at 2 keys so the pagination loop in r2.list_keys is exercised.
+    def list_objects_v2(self, Bucket, Prefix, ContinuationToken=None):
+        keys = sorted(k for k in self.objects if k.startswith(Prefix))
+        start = keys.index(ContinuationToken) if ContinuationToken else 0
+        page = keys[start : start + 2]
+        truncated = start + 2 < len(keys)
+        result = {"Contents": [{"Key": k} for k in page], "IsTruncated": truncated}
+        if truncated:
+            result["NextContinuationToken"] = keys[start + 2]
+        return result
+
 
 def _sample_export(root: Path) -> None:
     (root / "transcripts").mkdir(parents=True)
@@ -164,6 +175,8 @@ def test_legacy_export_uploads_verifies_and_resumes():
         assert third["uploaded"] == 1 and third["skipped"] == 2
 
         assert legacy.verify(s3=s3, bucket="archive") == {"count": 3, "missing": []}
+        # verification pages through a LIST, never a HEAD per file
+        assert r2.list_keys(s3, "archive", "legacy/assoli-v1/") == set(s3.objects)
         del s3.objects["legacy/assoli-v1/transcripts/b.json"]
         assert legacy.verify(s3=s3, bucket="archive")["missing"] == ["transcripts/b.json"]
 
