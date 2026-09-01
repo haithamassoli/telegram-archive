@@ -168,6 +168,22 @@ def test_legacy_export_uploads_verifies_and_resumes():
         assert legacy.verify(s3=s3, bucket="archive")["missing"] == ["transcripts/b.json"]
 
 
+def test_legacy_export_honours_exclude_globs():
+    s3 = FakeS3()
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _sample_export(root)
+        (root / "segments").mkdir()
+        (root / "segments/vid1.json").write_text("{}")
+        (root / "segments/nested").mkdir()
+        (root / "segments/nested/vid2.json").write_text("{}")
+
+        manifest = legacy.export(root, s3=s3, bucket="a", exclude=("segments/*",))
+        assert manifest["count"] == 3 and manifest["excluded"] == 2
+        assert not any(k.startswith("legacy/assoli-v1/segments/") for k in s3.objects)
+        assert manifest["excludePatterns"] == ["segments/*"]
+
+
 def test_legacy_export_rejects_a_missing_source():
     try:
         legacy.export(Path("/nonexistent/v1"), s3=FakeS3(), bucket="archive")

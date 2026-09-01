@@ -30,11 +30,13 @@ def cmd_gates(args) -> int:
 
 
 def cmd_legacy_export(args) -> int:
-    manifest = legacy.export(Path(args.source))
+    manifest = legacy.export(
+        Path(args.source), prefix=args.prefix, exclude=tuple(args.exclude)
+    )
     print(
         f"{manifest['count']} files ({manifest['totalBytes']} bytes) under "
-        f"{legacy.PREFIX}/ — {manifest['uploaded']} uploaded, "
-        f"{manifest['skipped']} already present"
+        f"{args.prefix}/ — {manifest['uploaded']} uploaded, "
+        f"{manifest['skipped']} already present, {manifest['excluded']} excluded"
     )
     return 0
 
@@ -112,6 +114,16 @@ def main(argv: list[str] | None = None) -> int:
 
     export = sub.add_parser("legacy-export", help="upload an assoli-v1 export dir to R2")
     export.add_argument("source", help="local directory holding the v1 export")
+    export.add_argument(
+        "--prefix", default=legacy.PREFIX, help=f"R2 key prefix (default {legacy.PREFIX})"
+    )
+    export.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="skip paths matching this glob, relative to source; repeatable",
+    )
     export.set_defaults(func=cmd_legacy_export)
 
     bench = sub.add_parser("bench", help="benchmark the GPU under the pinned config")

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import time
+from fnmatch import fnmatch
 from pathlib import Path
 
 from . import r2
@@ -18,17 +19,28 @@ SCHEMA_VERSION = 1
 
 
 def export(
-    source: Path, s3=None, bucket: str | None = None, prefix: str = PREFIX
+    source: Path,
+    s3=None,
+    bucket: str | None = None,
+    prefix: str = PREFIX,
+    exclude: tuple[str, ...] = (),
 ) -> dict:
-    """Upload every file under `source` and write a manifest. Returns the manifest."""
+    """Upload every file under `source` and write a manifest. Returns the manifest.
+
+    `exclude` holds glob patterns matched against each file's path relative to
+    `source`, so `segments/*` drops a whole subtree.
+    """
     if not source.is_dir():
         raise NotADirectoryError(f"{source} is not a directory")
     s3 = r2.client() if s3 is None else s3
     bucket = r2.bucket() if bucket is None else bucket
 
-    files, uploaded, skipped = [], 0, 0
+    files, uploaded, skipped, excluded = [], 0, 0, 0
     for path in sorted(p for p in source.rglob("*") if p.is_file()):
         rel = path.relative_to(source).as_posix()
+        if any(fnmatch(rel, pattern) for pattern in exclude):
+            excluded += 1
+            continue
         key = f"{prefix}/{rel}"
         digest = r2.sha256_file(path)
         size = path.stat().st_size
@@ -54,6 +66,8 @@ def export(
         "totalBytes": sum(f["sizeBytes"] for f in files),
         "uploaded": uploaded,
         "skipped": skipped,
+        "excluded": excluded,
+        "excludePatterns": list(exclude),
         "files": files,
     }
     s3.put_object(
