@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from archive import cli, config, gates, legacy, r2
+from archive import cli, config, gates, legacy, r2, telegram
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -279,6 +279,66 @@ def test_run_all_reports_every_gate_and_survives_a_broken_one():
 
 def test_cli_config_hash():
     assert cli.main(["config-hash"]) == 0
+
+
+def test_session_path_resolves_against_the_repo():
+    os.environ.pop("TELEGRAM_SESSION", None)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["TELEGRAM_SESSION"] = "secrets/x.session"
+        assert telegram.session_path() == REPO / "secrets/x.session"
+        absolute = Path(tmp) / "elsewhere.session"
+        os.environ["TELEGRAM_SESSION"] = str(absolute)
+        assert telegram.session_path() == absolute
+    os.environ.pop("TELEGRAM_SESSION", None)
+
+
+def test_an_unsigned_session_file_is_cleaned_and_fails_the_gate():
+    """Telethon writes auth_key during the key exchange, before asking for a
+    phone, so an abandoned login leaves a complete-looking session behind."""
+    original = telegram.account
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "abandoned.session"
+            path.write_bytes(b"sqlite-ish")
+
+            telegram.account = lambda p=None: None  # not signed in
+            assert telegram.clean_unauthorized(path) is True
+            assert not path.exists()
+
+            path.write_bytes(b"sqlite-ish")
+            telegram.account = lambda p=None: {"id": 7, "username": "archive"}
+            assert telegram.clean_unauthorized(path) is False
+            assert path.exists()  # a real session is never deleted
+    finally:
+        telegram.account = original
+
+
+def test_telegram_gate_rejects_a_session_nobody_signed_into():
+    original_account, original_path = telegram.account, telegram.session_path
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.session"
+            telegram.session_path = lambda: path
+            os.environ["TELEGRAM_API_ID"] = "1"
+            os.environ["TELEGRAM_API_HASH"] = "x"
+
+            assert gates.gate_telegram()[0] == "pending"  # no file yet
+
+            path.write_bytes(b"")
+            telegram.account = lambda p=None: None
+            status, detail = gates.gate_telegram()
+            assert status == "fail" and "not signed in" in detail
+
+            telegram.account = lambda p=None: {
+                "id": 7,
+                "username": "archive",
+                "phone": "1",
+            }
+            assert gates.gate_telegram()[0] == "pass"
+    finally:
+        telegram.account, telegram.session_path = original_account, original_path
+        for key in ("TELEGRAM_API_ID", "TELEGRAM_API_HASH"):
+            os.environ.pop(key, None)
 
 
 def test_gitignore_covers_the_secrets():

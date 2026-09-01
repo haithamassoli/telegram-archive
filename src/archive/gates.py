@@ -9,9 +9,8 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from pathlib import Path
 
-from . import legacy, r2
+from . import legacy, r2, telegram
 from .config import CONFIG_HASH, PINNED_CONFIG, REPO_ROOT, check_revision_drift, env
 
 RECORD_PATH = REPO_ROOT / "m0.gates.json"
@@ -137,13 +136,20 @@ def gate_telegram() -> tuple[str, str]:
     missing = [n for n in ("TELEGRAM_API_ID", "TELEGRAM_API_HASH") if not env(n)]
     if missing:
         return "pending", f"{', '.join(missing)} not set"
-    session = env("TELEGRAM_SESSION", "secrets/archive.session")
-    path = Path(session)
-    if not path.is_absolute():
-        path = REPO_ROOT / path
+    path = telegram.session_path()
+    rel = path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path
     if not path.is_file():
-        return "pending", f"session file {session} not created yet"
-    return "pass", f"api credentials set, session at {session}"
+        return "pending", f"no session at {rel} — run `archive telegram-login`"
+    try:
+        who = telegram.account(path)
+    except OSError as exc:
+        return "pending", f"cannot reach Telegram to check the session: {exc}"
+    if who is None:
+        return "fail", (
+            f"session at {rel} is not signed in (an abandoned login leaves one "
+            "behind) — delete it and run `archive telegram-login`"
+        )
+    return "pass", f"signed in as @{who['username'] or who['id']} ({who['phone']})"
 
 
 def gate_gpu_benchmark() -> tuple[str, str]:

@@ -33,6 +33,7 @@ is pointed at.
 archive config-hash                          # pinned config + its configHash
 archive gates                                # every M0 exit gate; exit 1 until all pass
 archive legacy-export <dir>                  # assoli-v1 export dir -> R2 legacy/assoli-v1/
+archive telegram-login                       # interactive first login (needs a real terminal)
 archive bench <audio...> --archive-hours 900 # GPU benchmark -> m0.gates.json
 ```
 

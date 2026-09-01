@@ -18,7 +18,7 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 **Goal:** every irreversible decision pinned, every external dependency proven, v1 data safe.
 **Exit:** `configHash` computed and logged; codec decision recorded; GPU benchmark numbers recorded and M2 schedule derived; legacy export verified in R2; transcribe doctor passes; Convex/R2/Meilisearch reachable with scoped keys.
 
-- [ ] Create dedicated Telegram account; store the SQLite `.session` file as a secret (never in git) — API app registered (`TELEGRAM_API_ID`/`TELEGRAM_API_HASH` in `.env`); session file created at first login in M1
+- [ ] Create dedicated Telegram account; store the SQLite `.session` file as a secret (never in git) — API app registered (`TELEGRAM_API_ID`/`TELEGRAM_API_HASH` in `.env`); run `archive telegram-login` on the dedicated account. The gate asks Telegram whether the session is signed in, because Telethon writes a complete-looking session file during the key exchange before it prompts for a phone
 - [x] Accept HF model terms; set `HF_TOKEN`/`HF_HOME` — verified by the `model-access` gate (pinned model+revision readable with the token)
 - [x] Pin transcription config → `src/archive/config.py`; `configHash=d27d1fb0a633fb8273f793655bd8ef82e6100da90f63340d1f9bb16c609bc4d5`, recorded in `m0.gates.json`; drift from the pin or from the package default fails the `config-pin` gate (§0.5)
 - [ ] Benchmark the actual GPU: RTF, files/batch, VRAM → projected archive runtime; schedule M2 from measurement — run `archive bench <audio...> --archive-hours N` (writes `m0.gates.json`)

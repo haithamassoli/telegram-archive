@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import gates, legacy
+from . import gates, legacy, telegram
 from .config import CONFIG_HASH, PINNED_CONFIG, canonical_json
 
 STATUS_MARK = {"pass": "PASS", "fail": "FAIL", "pending": "PEND"}
@@ -58,6 +58,25 @@ def _peak_memory(stats) -> tuple[float, str]:
         # A missing or unusual torch must not lose an otherwise good benchmark.
         pass
     return 0.0, "unavailable on this device"
+
+
+def cmd_telegram_login(args) -> int:
+    """First login for the dedicated archive account. Needs a real terminal."""
+    try:
+        account = telegram.login()
+    except (EOFError, KeyboardInterrupt):
+        # Telethon writes a session file during the key exchange, before it ever
+        # asks for a phone. Leaving that behind would look like a real login.
+        removed = telegram.clean_unauthorized()
+        print(f"\nlogin cancelled{'; removed the empty session file' if removed else ''}")
+        return 1
+    print(
+        f"logged in as {account['name']} "
+        f"(@{account['username'] or '—'}, id {account['id']}, {account['phone']})"
+    )
+    print(f"session written to {account['session']} (mode 600, gitignored)")
+    print("Confirm this is the dedicated archive account, not your personal one.")
+    return 0
 
 
 def cmd_bench(args) -> int:
@@ -125,6 +144,10 @@ def main(argv: list[str] | None = None) -> int:
         help="skip paths matching this glob, relative to source; repeatable",
     )
     export.set_defaults(func=cmd_legacy_export)
+
+    sub.add_parser(
+        "telegram-login", help="interactive first login; writes the .session file"
+    ).set_defaults(func=cmd_telegram_login)
 
     bench = sub.add_parser("bench", help="benchmark the GPU under the pinned config")
     bench.add_argument("audio", nargs="+", type=Path, help="sample audio files")
