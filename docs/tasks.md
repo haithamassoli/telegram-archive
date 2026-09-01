@@ -33,7 +33,7 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 
 **Decisions to close (§10 — must not block M1):**
 - [ ] GPU location (desktop vs server) — shapes M6 timers only
-- [ ] M1 download scope: two channels, or also `swteat_alkulife` / `swteat_k` while the downloader runs (download ≠ index)
+- [ ] M1 download scope: two channels, or also `doros_alkulify` / `alkulife` while the downloader runs (download ≠ index)
 - [ ] assoli-v1 salvage audit: any manually corrected transcripts? accounts/bookmarks/analytics worth exporting?
 
 ---
