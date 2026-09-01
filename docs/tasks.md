@@ -33,7 +33,7 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 
 **Decisions to close (§10 — must not block M1):**
 - [ ] GPU location (desktop vs server) — shapes M6 timers only
-- [ ] M1 download scope — resolved on the live account, counts as of 2026-09-01:
+- [x] M1 download scope — resolved on the live account, counts as of 2026-09-01:
   | channel | msgs | range | title |
   |---|---|---|---|
   | `@doros_alkulify` | 11,899 | 2017-09-08 → 2026-09-01 | المواد الصوتية / عبد الله الخليفي |
@@ -42,7 +42,7 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
   | `@alkulifyfgh` | 16 | 2024-10-14 → 2026-03-16 | الفقه سؤال وجواب |
   | `@KulifyAntiCapitalism` | 9 | 2022-12-25 → 2025-10-02 | نقد الرأسمالية / الخليفي |
 
-  The two primary channels are `@doros_alkulify` (audio) and `@alkulife`. The other three add 929 messages — under 3.5% — so downloading them costs almost nothing and avoids a second Telegram-clocked pass. Download ≠ index. Owner to confirm.
+  **Decided: M1 downloads `@alkulife` and `@doros_alkulify` only** (26,686 messages). The other three are deliberately out of scope for now; adding them later costs a second Telegram-clocked pass over ~929 messages, which is cheap.
 - [ ] assoli-v1 salvage audit: any manually corrected transcripts? accounts/bookmarks/analytics worth exporting?
 
 ---

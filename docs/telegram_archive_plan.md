@@ -255,5 +255,5 @@ The remaining uncertainty — title-format drift across eras, grouping accuracy,
 ## 10. Open Items (do not block Phase 0/1)
 
 1. GPU location (desktop vs server) — shapes Phase-6 timers only.
-2. Phase-1 download scope — primaries are `@doros_alkulify` (11,899 msgs) and `@alkulife` (14,787); optional extras `@T_alkulife` (904), `@alkulifyfgh` (16), `@KulifyAntiCapitalism` (9). Download ≠ index.
+2. Phase-1 download scope — **decided: `@alkulife` (14,787 msgs) and `@doros_alkulify` (11,899) only.** `@T_alkulife` (904), `@alkulifyfgh` (16) and `@KulifyAntiCapitalism` (9) are out of scope for now.
 3. assoli-v1 salvage — any manually corrected transcripts? Anything else in the v1 data model (accounts, bookmarks, analytics) worth exporting?
