@@ -730,5 +730,64 @@ def test_a_takeout_id_survives_a_session_round_trip():
             SQLiteSession(str(path)).close()
 
 
+def test_an_expired_file_reference_is_renewed_not_failed():
+    """A batch of lesson-sized audio takes hours to drain, so the reference a
+    message was handed with can go stale before its turn to download."""
+    from telethon.errors import FileReferenceExpiredError
+
+    fresh = FakeMessage(id=7, kind="audio")
+    calls = []
+
+    class Client:
+        def download_media(self, msg, file):
+            calls.append(msg)
+            if msg is not fresh:
+                raise FileReferenceExpiredError(request=None)
+            return file + ".mp3"
+
+    got = ingest._download(
+        Client(), FakeMessage(id=7, kind="audio"), lambda i: fresh, lambda m: None
+    )
+    assert got.endswith("7.mp3"), got
+    assert len(calls) == 2 and calls[1] is fresh
+
+    # Without a way to re-fetch there is nothing to do but fail, so §4.6 retries.
+    try:
+        ingest._download(Client(), FakeMessage(id=7, kind="audio"), None, lambda m: None)
+        raise AssertionError("expected the expiry to propagate")
+    except FileReferenceExpiredError:
+        pass
+
+
+def test_an_interrupt_stops_before_the_checkpoint_moves():
+    """Ctrl-C mid-download is swallowed by asyncio, so the flag is checked
+    between messages — and it has to fire before the batch is published."""
+    convex_fake, s3, tg = FakeConvex(), FakeS3(), FakeTelegram(script())
+    undo = patch({"convex": convex_fake, "ffprobe": lambda p: {"durationMs": 1000}})
+    ingest._stop = True
+    try:
+        channel = convex_fake.m_upsertChannel(username="fake", title="fake")
+        ingest._flush(
+            tg,
+            s3,
+            "bucket",
+            channel["id"],
+            "fake",
+            tg.messages,
+            FakeCounts(),
+            lambda *a: None,
+        )
+        raise AssertionError("expected the interrupt to stop the batch")
+    except KeyboardInterrupt:
+        pass
+    finally:
+        ingest._stop = False
+        undo()
+
+    assert tg.downloads == [], tg.downloads
+    assert not [k for k in s3.objects if k.startswith("meta/")], list(s3.objects)
+    assert convex_fake.channels["fake"]["lastMessageId"] == 0
+
+
 if __name__ == "__main__":
     sys.exit(main())

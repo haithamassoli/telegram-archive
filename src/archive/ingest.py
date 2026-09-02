@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import signal
 import sqlite3
 import subprocess
 from datetime import UTC, datetime
@@ -36,6 +37,26 @@ TMP_DIR = REPO_ROOT / ".tmp" / "ingest"
 # Telegram requires a size cap alongside `files=True`. 4 GiB is the largest a
 # Telegram upload can be, so nothing in a channel is excluded by this.
 TAKEOUT_MAX_FILE_BYTES = 4 * 1024**3
+
+
+_stop = False
+
+
+def _watch_for_interrupt() -> None:
+    """Make Ctrl-C stop the run at the next message boundary.
+
+    Telethon downloads through asyncio, which turns a KeyboardInterrupt raised
+    mid-download into a cancelled task: the interrupt is swallowed and the
+    message is recorded as a failure while the run carries on. Between messages
+    is the only place the interrupt is ours to act on.
+    """
+
+    def handler(signum, frame):
+        global _stop
+        _stop = True
+        _log("interrupt received — stopping at the next message")
+
+    signal.signal(signal.SIGINT, handler)
 
 
 def _log(message: str) -> None:
@@ -191,8 +212,27 @@ def blob_key(sha256: str, ext: str) -> str:
     return f"blobs/{sha256[:2]}/{sha256}.{ext}"
 
 
+def _download(client, msg, refetch, log):
+    """Download `msg`'s binary, renewing an expired file reference once.
+
+    A 500-message batch of lesson-sized audio takes hours to drain, and the file
+    reference handed out with the message does not live that long. Re-fetching
+    the message is the only way to get a fresh one.
+    """
+    from telethon.errors import FileReferenceExpiredError
+
+    dest = str(TMP_DIR / f"{msg.id}")
+    try:
+        return client.download_media(msg, file=dest)
+    except FileReferenceExpiredError:
+        if refetch is None:
+            raise
+        log(f"  {msg.id} file reference expired, re-fetching")
+        return client.download_media(refetch(msg.id), file=dest)
+
+
 def ingest_media(
-    client, s3, bucket: str, message_id: str, msg, counts, log=_log
+    client, s3, bucket: str, message_id: str, msg, counts, log=_log, refetch=None
 ) -> dict | None:
     """download -> sha256 -> ffprobe -> blob to R2 -> Convex rows -> delete temp.
 
@@ -201,7 +241,7 @@ def ingest_media(
     existing row decides the key, so the same bytes can never end up under two
     of them, and there is nothing to upload or probe again.
     """
-    path = client.download_media(msg, file=str(TMP_DIR / f"{msg.id}"))
+    path = _download(client, msg, refetch, log)
     if path is None:
         # Telethon returns None when it declined to download rather than when it
         # failed. Swallowing it would leave a message row claiming media, no
@@ -332,14 +372,18 @@ def write_meta_batch(s3, bucket: str, username: str, raws: list[dict]) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def _ingest_one(client, s3, bucket, channel_id, username, msg, counts, log=_log) -> None:
+def _ingest_one(
+    client, s3, bucket, channel_id, username, msg, counts, log=_log, refetch=None
+) -> None:
     args = message_args(channel_id, username, msg)
     row = convex.mutation("mutations:upsertTelegramMessage", **args)
     if args["mediaType"] != "none":
-        ingest_media(client, s3, bucket, row["id"], msg, counts, log=log)
+        ingest_media(client, s3, bucket, row["id"], msg, counts, log=log, refetch=refetch)
 
 
-def _flush(client, s3, bucket, channel_id, username, batch, counts, log) -> int:
+def _flush(
+    client, s3, bucket, channel_id, username, batch, counts, log, refetch=None
+) -> int:
     """Ingest one batch, then publish its meta artifact and advance the checkpoint."""
     first, last = batch[0].id, batch[-1].id
     done = set(
@@ -351,12 +395,18 @@ def _flush(client, s3, bucket, channel_id, username, batch, counts, log) -> int:
         )
     )
     for msg in batch:
+        if _stop:
+            # Before the meta artifact and the checkpoint, so the whole batch
+            # replays on resume rather than being silently skipped past.
+            raise KeyboardInterrupt
         counts.processed += 1
         if msg.id in done:
             counts.skipped += 1
             continue
         try:
-            _ingest_one(client, s3, bucket, channel_id, username, msg, counts, log)
+            _ingest_one(
+                client, s3, bucket, channel_id, username, msg, counts, log, refetch
+            )
             counts.success += 1
         except KeyboardInterrupt:
             raise
@@ -384,7 +434,7 @@ def _flush(client, s3, bucket, channel_id, username, batch, counts, log) -> int:
 
 
 def _drain_failures(
-    client, worker, s3, bucket, entity, channel_id, username, counts, log
+    client, worker, s3, bucket, entity, channel_id, username, counts, log, refetch=None
 ) -> None:
     """§4.6 — retry this stage's unresolved failures before touching new work."""
     rows = convex.query("queries:unresolvedFailures", stage=STAGE)
@@ -406,7 +456,9 @@ def _drain_failures(
             msg = client.get_messages(entity, ids=msg_id)
             if msg is None:
                 raise LookupError("message no longer exists in the channel")
-            _ingest_one(worker, s3, bucket, channel_id, username, msg, counts, log)
+            _ingest_one(
+                worker, s3, bucket, channel_id, username, msg, counts, log, refetch
+            )
             convex.mutation("mutations:resolveFailure", stage=STAGE, refKey=row["refKey"])
             counts.success += 1
         except KeyboardInterrupt:
@@ -449,7 +501,13 @@ def sync_channel(
     channel_id, start = channel["id"], channel["lastMessageId"]
     log(f"{username}: resuming after message {start}")
 
-    _drain_failures(client, worker, s3, bucket, entity, channel_id, username, counts, log)
+    def refetch(msg_id):
+        """A message with a fresh file reference, off the plain session."""
+        return client.get_messages(entity, ids=msg_id)
+
+    _drain_failures(
+        client, worker, s3, bucket, entity, channel_id, username, counts, log, refetch
+    )
 
     batch: list = []
     seen = 0
@@ -459,10 +517,10 @@ def sync_channel(
         batch.append(msg)
         seen += 1
         if len(batch) >= batch_size:
-            _flush(worker, s3, bucket, channel_id, username, batch, counts, log)
+            _flush(worker, s3, bucket, channel_id, username, batch, counts, log, refetch)
             batch = []
     if batch:
-        _flush(worker, s3, bucket, channel_id, username, batch, counts, log)
+        _flush(worker, s3, bucket, channel_id, username, batch, counts, log, refetch)
     counts.notes.append(f"{username}:{seen}")
     return {"channel": username, "fetched": seen, "channelId": channel_id}
 
@@ -637,6 +695,7 @@ def sync(
     if shutil.which("ffprobe") is None:
         raise RuntimeError("ffprobe is not on PATH — install ffmpeg before syncing")
 
+    _watch_for_interrupt()
     with pipeline.stage(STAGE) as counts:
         pipeline.clear_dir(TMP_DIR)
         s3 = r2.client()
