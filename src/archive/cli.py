@@ -161,7 +161,17 @@ def cmd_verify_archive(args) -> int:
             print(f"  !! {entry['url']}: {', '.join(entry['problems'])}")
         for key in report["missingBatches"]:
             print(f"  !! meta batch missing from R2: {key}")
-        if bad or report["missingBatches"] or report["archived"] < report["liveTotal"]:
+        for msg_id in report["unlinkedMedia"]:
+            print(f"  !! message {msg_id} claims a binary that was never stored")
+        for ref in report["openFailures"]:
+            print(f"  !! unresolved ingest failure: {ref}")
+        if (
+            bad
+            or report["missingBatches"]
+            or report["unlinkedMedia"]
+            or report["openFailures"]
+            or report["archived"] < report["liveTotal"]
+        ):
             failed = True
     return 1 if failed else 0
 

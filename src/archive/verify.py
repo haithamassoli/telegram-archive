@@ -19,9 +19,10 @@ SPOT_CHECKS = 20
 SCAN_PAGE = 500
 
 
-def archived_ids(channel_id: str) -> tuple[list[int], int]:
-    """Every archived message id for the channel, and how many carry a binary."""
+def archived_ids(channel_id: str) -> tuple[list[int], int, list[int]]:
+    """Archived ids, how many carry a binary, and which are missing that binary."""
     ids: list[int] = []
+    unlinked: list[int] = []
     with_media = 0
     cursor = 0
     while True:
@@ -32,9 +33,10 @@ def archived_ids(channel_id: str) -> tuple[list[int], int]:
             limit=SCAN_PAGE,
         )
         ids.extend(page["ids"])
+        unlinked.extend(page["unlinked"])
         with_media += page["withMedia"]
         if page["nextFromId"] is None or page["count"] < SCAN_PAGE:
-            return ids, with_media
+            return ids, with_media, unlinked
         cursor = page["nextFromId"]
 
 
@@ -76,7 +78,7 @@ def verify_channel(
     entity = client.get_entity(username)
     live_total = client.get_messages(entity, limit=0).total
 
-    ids, with_media = archived_ids(channel["_id"])
+    ids, with_media, unlinked = archived_ids(channel["_id"])
     # Telegram counts service messages and skips deleted ids, so the archived
     # count is compared to the channel's own total rather than to max(id).
     gaps = [(a, b) for a, b in itertools.pairwise(ids) if b - a > 1]
@@ -106,6 +108,12 @@ def verify_channel(
         "liveTotal": live_total,
         "archived": len(ids),
         "withMedia": with_media,
+        "unlinkedMedia": unlinked,
+        "openFailures": [
+            row["refKey"]
+            for row in convex.query("queries:unresolvedFailures", stage=ingest.STAGE)
+            if row["refKey"].startswith(f"{username}/")
+        ],
         "checkpoint": channel["lastMessageId"],
         "idGaps": len(gaps),
         "metaBatches": len(manifest["batches"]) if manifest else 0,

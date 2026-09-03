@@ -97,10 +97,22 @@ export const channelScan = query({
       )
       .take(args.limit);
     let withMedia = 0;
-    for (const row of rows) if (row.mediaType !== "none") withMedia += 1;
+    // A message claiming a binary with no `messageMedia` row is the one failure
+    // M1 must never report as archived: the blob is missing, not merely absent.
+    const unlinked: number[] = [];
+    for (const row of rows) {
+      if (row.mediaType === "none") continue;
+      withMedia += 1;
+      const link = await ctx.db
+        .query("messageMedia")
+        .withIndex("by_message", (q) => q.eq("messageId", row._id))
+        .first();
+      if (link === null) unlinked.push(row.telegramMessageId);
+    }
     return {
       count: rows.length,
       withMedia,
+      unlinked,
       ids: rows.map((row) => row.telegramMessageId),
       nextFromId: rows.length
         ? rows[rows.length - 1].telegramMessageId + 1
