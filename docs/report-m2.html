@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M2 — تفريغ كل المقاطع الصوتية · أرشيف تيليجرام المعرفي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#EFF2F0; --surface:#FFFFFF; --surface-2:#F6F8F7;
+    --ink:#14201D; --ink-soft:#3E4F4A; --muted:#687974;
+    --line:#DDE4E1; --line-strong:#C4CFCB;
+    --accent:#0E6B58; --accent-soft:#E2F0EB; --accent-ink:#0A4C3F;
+    --brass:#8A6A2A; --brass-soft:#F4EEDF;
+    --alert:#A33227; --alert-soft:#F8E7E4;
+    --shadow:0 1px 2px rgba(20,32,29,.05), 0 8px 24px -16px rgba(20,32,29,.25);
+    --serif:"Amiri", "Times New Roman", serif;
+    --sans:"IBM Plex Sans Arabic", "Segoe UI", system-ui, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1614; --surface:#161F1D; --surface-2:#1B2523;
+      --ink:#E4EBE8; --ink-soft:#B6C4C0; --muted:#8A9A95;
+      --line:#26332F; --line-strong:#35443F;
+      --accent:#54C0A4; --accent-soft:#12302A; --accent-ink:#8FD9C4;
+      --brass:#C9A75E; --brass-soft:#2C2718;
+      --alert:#E08376; --alert-soft:#33201C;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1614; --surface:#161F1D; --surface-2:#1B2523;
+    --ink:#E4EBE8; --ink-soft:#B6C4C0; --muted:#8A9A95;
+    --line:#26332F; --line-strong:#35443F;
+    --accent:#54C0A4; --accent-soft:#12302A; --accent-ink:#8FD9C4;
+    --brass:#C9A75E; --brass-soft:#2C2718;
+    --alert:#E08376; --alert-soft:#33201C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.75; -webkit-font-smoothing:antialiased;}
+  .page{direction:rtl; max-width:1180px; margin:0 auto; padding:0 24px 96px;}
+  *{box-sizing:border-box;}
+  h1,h2,h3,h4{font-family:var(--serif); font-weight:700; text-wrap:balance; line-height:1.35; margin:0;}
+  p{margin:0;}
+  a{color:var(--accent-ink); text-decoration-color:var(--line-strong); text-underline-offset:3px;}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px;}
+  code,.mono,.k{font-family:var(--mono); font-size:.86em; direction:ltr; unicode-bidi:isolate;}
+  code{background:var(--surface-2); border:1px solid var(--line); border-radius:5px; padding:.05em .35em;}
+
+  /* ---- masthead ---- */
+  .masthead{padding:64px 0 40px; border-bottom:1px solid var(--line);}
+  .eyebrow{font-size:.78rem; letter-spacing:.16em; color:var(--muted); font-weight:600;}
+  .masthead h1{font-size:clamp(2.4rem,5.5vw,3.6rem); margin:14px 0 10px;}
+  .lede{font-size:1.12rem; color:var(--ink-soft); max-width:62ch;}
+  .badges{display:flex; flex-wrap:wrap; gap:8px; margin-top:22px;}
+  .badge{font-size:.78rem; font-weight:600; padding:5px 11px; border-radius:999px; border:1px solid var(--line-strong); color:var(--ink-soft); background:var(--surface);}
+  .badge.frozen{background:var(--accent-soft); border-color:transparent; color:var(--accent-ink);}
+  .badge.mono{font-family:var(--mono); font-size:.72rem; font-weight:500;}
+
+  /* ---- metrics ---- */
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden; margin:36px 0 8px;}
+  .metric{background:var(--surface); padding:20px 18px;}
+  .metric .n{font-family:var(--serif); font-size:2.1rem; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;}
+  .metric .l{font-size:.82rem; color:var(--muted); margin-top:8px;}
+
+  /* ---- layout ---- */
+  .shell{display:grid; grid-template-columns:1fr; gap:48px; margin-top:56px;}
+  @media(min-width:1000px){ .shell{grid-template-columns:230px 1fr; gap:56px;} }
+  nav.toc{align-self:start; font-size:.9rem;}
+  @media(min-width:1000px){ nav.toc{position:sticky; top:24px; max-height:calc(100vh - 48px); overflow:auto;} }
+  nav.toc ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  nav.toc a{display:block; padding:5px 10px; border-radius:6px; text-decoration:none; color:var(--ink-soft); border-right:2px solid transparent;}
+  nav.toc a:hover{background:var(--surface); color:var(--ink); border-right-color:var(--accent);}
+  nav.toc .tocgap{margin-top:14px; font-size:.74rem; letter-spacing:.14em; color:var(--muted); font-weight:600; padding:0 10px;}
+
+  main{min-width:0; display:flex; flex-direction:column; gap:56px;}
+  section{scroll-margin-top:20px; display:flex; flex-direction:column; gap:18px;}
+  section > h2{font-size:1.75rem; padding-bottom:12px; border-bottom:2px solid var(--ink); display:flex; align-items:baseline; gap:12px;}
+  section > h2 .num{font-family:var(--mono); font-size:.8rem; font-weight:500; color:var(--accent); letter-spacing:.05em;}
+  section p{max-width:68ch;}
+  h3{font-size:1.18rem;}
+  .sub{color:var(--muted); font-size:.92rem;}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px 24px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:12px;}
+  .cards{display:grid; gap:16px;}
+  @media(min-width:700px){ .cards.two{grid-template-columns:1fr 1fr;} }
+
+  ul.plain{margin:0; padding:0 1.2em 0 0; display:flex; flex-direction:column; gap:9px;}
+  ul.plain li{padding-inline-start:4px;}
+  ul.plain li::marker{color:var(--accent);}
+
+  /* ---- rules list ---- */
+  .rules{counter-reset:r; display:flex; flex-direction:column; gap:12px;}
+  .rule{display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px 18px;}
+  .rule .rn{counter-increment:r; font-family:var(--mono); font-size:.78rem; font-weight:500; color:var(--accent-ink); background:var(--accent-soft); width:26px; height:26px; border-radius:7px; display:grid; place-items:center;}
+  .rule .rn::before{content:counter(r);}
+  .rule b{display:block; margin-bottom:2px;}
+
+  /* ---- identity ladder ---- */
+  .ladder{display:flex; flex-direction:column; gap:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--surface);}
+  .rung{display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:14px 20px; border-bottom:1px solid var(--line);}
+  .rung:last-child{border-bottom:0;}
+  .rung .what{font-weight:600;}
+  .rung .id{font-family:var(--mono); font-size:.82rem; color:var(--accent-ink); background:var(--accent-soft); padding:4px 10px; border-radius:6px; direction:ltr; white-space:nowrap;}
+
+  /* ---- tables ---- */
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface);}
+  table{border-collapse:collapse; width:100%; min-width:520px; font-size:.93rem;}
+  th,td{text-align:right; padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top;}
+  thead th{background:var(--surface-2); font-size:.8rem; letter-spacing:.05em; color:var(--muted); font-weight:600; white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:0;}
+  td .k{color:var(--accent-ink);}
+
+  /* ---- schema / tree blocks ---- */
+  pre.tree{margin:0; overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; direction:ltr; text-align:left; font-family:var(--mono); font-size:.82rem; line-height:1.85; color:var(--ink-soft);}
+  pre.tree b{color:var(--accent-ink); font-weight:500;}
+  pre.tree i{color:var(--muted); font-style:normal;}
+
+  /* ---- phases ---- */
+  .phase{display:grid; grid-template-columns:auto 1fr; gap:18px;}
+  .phase .spine{display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .phase .dot{width:34px; height:34px; border-radius:10px; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-family:var(--mono); font-size:.8rem; font-weight:500; border:1px solid var(--line);}
+  .phase .line{flex:1; width:2px; background:var(--line);}
+  .phase:last-child .line{display:none;}
+  .phase .body{padding-bottom:26px; display:flex; flex-direction:column; gap:10px;}
+  .phase h3{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px;}
+  .phase h3 .cost{font-family:var(--sans); font-size:.78rem; font-weight:600; color:var(--brass); background:var(--brass-soft); padding:3px 9px; border-radius:999px;}
+
+  /* ---- milestones ---- */
+  .ms{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); overflow:hidden;}
+  .ms > summary{list-style:none; cursor:pointer; padding:18px 22px; display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center;}
+  .ms > summary::-webkit-details-marker{display:none;}
+  .ms .tag{font-family:var(--mono); font-size:.8rem; font-weight:500; color:var(--accent-ink); background:var(--accent-soft); padding:5px 9px; border-radius:7px;}
+  .ms .ttl{font-family:var(--serif); font-size:1.15rem; font-weight:700;}
+  .ms .count{font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .ms .count::after{content:" ▾"; color:var(--line-strong);}
+  .ms[open] .count::after{content:" ▴";}
+  .ms .inner{padding:0 22px 22px; display:flex; flex-direction:column; gap:16px; border-top:1px solid var(--line); margin-top:2px; padding-top:18px;}
+  .goal{display:grid; gap:10px;}
+  .goal div{display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:baseline;}
+  .goal span.lbl{font-size:.76rem; font-weight:700; letter-spacing:.08em; color:var(--muted); white-space:nowrap;}
+  ul.tasks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  ul.tasks li{display:grid; grid-template-columns:auto 1fr; gap:12px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:.95rem;}
+  ul.tasks li:last-child{border-bottom:0;}
+  ul.tasks li::before{content:""; width:15px; height:15px; margin-top:.4em; border:1.5px solid var(--line-strong); border-radius:4px; background:var(--surface-2);}
+  .subhead{font-size:.78rem; font-weight:700; letter-spacing:.08em; color:var(--brass); margin-top:6px;}
+
+  .note{background:var(--accent-soft); border-radius:10px; padding:16px 20px; color:var(--accent-ink); font-size:.95rem;}
+  .note.warn{background:var(--brass-soft); color:var(--brass);}
+  .note.stop{background:var(--alert-soft); color:var(--alert);}
+  .note b{font-weight:700;}
+
+  footer{margin-top:72px; padding-top:24px; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem; display:flex; flex-wrap:wrap; gap:8px 20px; justify-content:space-between;}
+  @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important;} }
+</style>
+<style>
+  ul.tasks li.done::before{background:var(--accent); border-color:var(--accent);}
+  ul.tasks li.open::before{border-color:var(--brass); background:var(--brass-soft);}
+  .kv{display:grid; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  .kv > div{background:var(--surface); padding:14px 18px; display:grid; grid-template-columns:220px 1fr; gap:16px; align-items:baseline;}
+  .kv b{font-weight:600; color:var(--ink-soft); font-size:.9rem;}
+  @media(max-width:640px){ .kv > div{grid-template-columns:1fr;} }
+</style>
+<div class="page" dir="rtl" lang="ar">
+
+<header class="masthead">
+  <div class="eyebrow">تقرير محطة · أرشيف تيليجرام المعرفي</div>
+  <h1>M2 — تفريغ كل المقاطع الصوتية</h1>
+  <p class="lede">وحدة المعالجة الرسومية هي الساعة في هذه المرحلة، فكل ما بُني هنا غايته ألّا تُنفق ثانية منها مرتين. المرحلة مكتملة برمجيًا ومُختبَرة ومُتحقَّق منها على النشر الحي — والحملة نفسها، وهي ١٢٤ ساعة معالجة متصلة، لم تُطلق بعد.</p>
+  <div class="badges">
+    <span class="badge frozen">الخطة v2.2 مجمّدة</span>
+    <span class="badge">المرحلة 2 من الخطة</span>
+    <span class="badge mono">configHash d27d1fb0a633</span>
+    <span class="badge mono">commit 58ea0a4</span>
+    <span class="badge mono">Apple MPS · RTF 23.5×</span>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="n">٩٬٧٩٣</div><div class="l">ملفًا صوتيًا فريدًا (بصمة sha256)</div></div>
+    <div class="metric"><div class="n">٢٬٩٢٦٫٦</div><div class="l">ساعة صوت في الأرشيف</div></div>
+    <div class="metric"><div class="n">١٢٤٫٣</div><div class="l">ساعة معالجة متوقّعة للحملة</div></div>
+    <div class="metric"><div class="n">٢٣٫٥×</div><div class="l">سرعة مقابل الزمن الحقيقي</div></div>
+    <div class="metric"><div class="n">١٨</div><div class="l">اختبارًا جديدًا، جميعها تمرّ</div></div>
+    <div class="metric"><div class="n">٣</div><div class="l">ملفات فُرِّغت فعليًا حتى الآن</div></div>
+  </div>
+</header>
+
+<div class="shell">
+<nav class="toc" aria-label="فهرس">
+  <ol>
+    <li><a href="#summary">§0 الملخص التنفيذي</a></li>
+    <li><a href="#gates">§1 البوابات الثلاث</a></li>
+    <li><a href="#identity">§2 الهوية وترتيب الكتابة</a></li>
+    <li><a href="#bench">§3 قياس العتاد</a></li>
+    <li><a href="#scope">§4 ما الذي يُعدّ «صوتًا»؟</a></li>
+    <li><a href="#live">§5 التحقق على النشر الحي</a></li>
+    <li><a href="#tests">§6 الاختبارات</a></li>
+    <li><a href="#review">§7 المراجعة وما أُصلح</a></li>
+    <li><a href="#rest">§8 ما تبقّى</a></li>
+    <li><a href="#cmds">§9 الأوامر</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="summary">
+  <h2><span class="num">§0</span> الملخص التنفيذي</h2>
+  <p>أضافت هذه المحطة أمرين إلى خط المعالجة: <code>archive transcribe</code> الذي يقود كل ملف صوتي فريد إلى تفريغ نصي مُثبت في R2 وسجل <span class="k">done</span> في Convex، و<code>archive reconcile-artifacts</code> الذي يجبر Convex وR2 على الاتفاق أو على الشكوى. كما أُغلقت بوابة قياس العتاد في M0، وهي البوابة التي تُجدوَل منها هذه المرحلة أصلًا.</p>
+  <div class="cards two">
+    <div class="card">
+      <h3>ما اكتمل</h3>
+      <ul class="plain">
+        <li>الاختيار والتخطي والتعافي من نافذة الانهيار (§4.2 و§4.3)</li>
+        <li>قانون ترتيب الكتابة: الملف في R2 قبل السجل في Convex (§4.1)</li>
+        <li>التحقق من أصل التفريغ مقابل الإعداد المثبَّت — التعارض فشل، لا هوية جديدة</li>
+        <li>تصريف الإخفاقات أولًا مع سقف خمس محاولات (§4.6)</li>
+        <li>المصالحة بين المخزنين في الاتجاهين (§4.4)</li>
+        <li>قياس العتاد الحقيقي وتسجيله في <code>m0.gates.json</code></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>ما لم يُنجز بعد</h3>
+      <ul class="plain">
+        <li><b>الحملة نفسها.</b> التغطية الآن ٣ من ٩٬٧٩٣. تشغيلها قرار يُتخذ على جهاز المعالجة، لا أثر جانبي لهذا الالتزام</li>
+        <li>٥٠٠ سجل بحالة <span class="k">processing</span> خلّفها تشغيل تجريبي أُوقف عمدًا؛ تعود قابلة للالتقاط بعد نافذة الخمس دقائق</li>
+        <li>قرار مؤجَّل: ٩٤ ملف فيديو (٦٫٢ ساعة) خارج نطاق M2 بنصّ الخطة</li>
+        <li>بوابتا M0 المتبقيتان: الترميز الصوتي وMeilisearch</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note"><b>الخلاصة:</b> الكود جاهز ومُثبت بالتجربة على بيانات حقيقية لا على محاكاة فقط؛ ما ينقص هو وقت العتاد.</div>
+</section>
+
+<section id="gates">
+  <h2><span class="num">§1</span> البوابات الثلاث — كيف تُنفق ساعة المعالجة مرة واحدة</h2>
+  <p>كل تشغيل يمسح الملفات الفريدة البالغة ١١٬٤٦٠ مرة واحدة، ولا يصل الملف إلى النموذج إلا بعد أن تسمح له بوابتان أرخص منه:</p>
+  <div class="rules">
+    <div class="rule"><span class="rn"></span><div><b>المسار السريع (§4.2)</b> سجل <span class="k">done</span> في Convex لبصمة الإعداد الفعّالة يُتخطّى دون لمس R2 ولا النموذج. الاستعلام الجديد <code>mediaObjectsPage</code> يمشي على الملفات بترتيب بصمتها ويضمّ إلى كل صف تفريغه، فلا تكلّف البوابة أي طلب إضافي.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>نافذة الانهيار (§4.3)</b> الصف غير المكتمل — معلّق أو فاشل أو مفقود أو «قيد المعالجة» منذ أكثر من خمس دقائق — يُحسب مفتاحه في R2 حسابًا حتميًا. المفتاح يُقارَن بقائمة واحدة لبادئة <code>transcripts/</code> بدل ٩٬٧٩٣ طلب فحص منفصل، ثم يُقرأ الملف ويُتحقق منه ويُرقّى إلى <span class="k">done</span> دون أي استدلال.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>النموذج</b> ما تبقّى فقط. النموذج يُحمَّل تحميلًا كسولًا: تشغيل لا عمل فيه لا يُحمِّل النموذج ذا المليارين من المعاملات إطلاقًا، وقد تحقّقنا من ذلك بالاختبار وبالقياس الحي (سبع ثوانٍ للتشغيل الذي تعافى من R2).</div></div>
+  </div>
+</section>
+
+<section id="identity">
+  <h2><span class="num">§2</span> الهوية وترتيب الكتابة</h2>
+  <div class="ladder">
+    <div class="rung"><span class="what">هوية التفريغ الجزئي</span><span class="id">sha256 + configHash</span></div>
+    <div class="rung"><span class="what">مفتاح الملف في R2</span><span class="id">transcripts/{sha256}/{configHash}.json</span></div>
+    <div class="rung"><span class="what">ترتيب الكتابة</span><span class="id">R2 → Convex done</span></div>
+  </div>
+  <p>لأن الهوية هي الإعداد نفسه، فإن تفريغًا لم يُنتجه الإعداد المثبَّت لا يجوز أن يُحفظ تحت مفتاحه. الملف الناتج يسجّل بنفسه النموذج والمراجعة واللغة وكاشف الكلام ودمج المقاطع ونمط التوقيت، و<code>validate_artifact</code> يقارن الحقول الستة كلها بالإعداد المثبَّت: أي اختلاف <b>فشل يُسجَّل</b>، لا هوية جديدة تُخترع. والفحص نفسه يُستعمل للملف الخارج من النموذج وللملف المستردّ من R2.</p>
+  <div class="note warn"><b>لماذا هذا مهم:</b> لو سُمح لملف من إعداد آخر أن يُحفظ تحت هذا المفتاح، لصار الأرشيف يحمل نصوصًا لا يمكن تفسير مصدرها، ولانهار المعنى الكامل لبصمة الإعداد.</div>
+</section>
+
+<section id="bench">
+  <h2><span class="num">§3</span> قياس العتاد — البوابة التي تُجدوَل منها المرحلة</h2>
+  <p>القياس جرى على صوت حقيقي من الأرشيف نفسه: رسالة صوتية من ٤٫٥ دقائق ودرس من ٢١ دقيقة، مجموعهما ٢٥٫٩ دقيقة.</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>القياس</th><th>القيمة</th><th>الملاحظة</th></tr></thead>
+    <tbody>
+      <tr><td>الجهاز</td><td class="k">mps</td><td>Apple Silicon، لا CUDA</td></tr>
+      <tr><td>السرعة مقابل الزمن الحقيقي</td><td class="k">23.54×</td><td>٦٦ ثانية لـ٢٥٫٩ دقيقة صوت</td></tr>
+      <tr><td>الذاكرة أثناء التشغيل</td><td class="k">4.14 GB</td><td>قراءة حيّة والنموذج محمَّل</td></tr>
+      <tr><td>ملفات لكل دفعة استدلال</td><td class="k">0.29</td><td>أقل من واحد لأن الدرس الطويل يمتد على عدة دفعات</td></tr>
+      <tr><td>الزمن المتوقّع للأرشيف</td><td class="k">124.3 h</td><td>٢٬٩٢٦٫٦ ساعة ÷ ٢٣٫٥ ≈ ٥٫٢ أيام متصلة</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>خلل انكشف أثناء القياس وأُصلح: أمر <code>archive bench</code> كان يقرأ ذاكرة الجهاز <b>بعد</b> إغلاق المفرِّغ، فيسجّل ٠٫٠٣ غيغابايت من لا شيء — إذ لا يوفّر MPS عدّادًا للذروة أصلًا. صار القياس يؤخذ والنموذج ما يزال مقيمًا في الذاكرة، والوصف المسجَّل معه يقول صراحةً إنها قراءة حيّة لا ذروة.</p>
+</section>
+
+<section id="scope">
+  <h2><span class="num">§4</span> ما الذي يُعدّ «صوتًا»؟</h2>
+  <p>أول مسح كامل للأرشيف كشف التوزيع الآتي للملفات الفريدة البالغة ١١٬٤٦٠:</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>النوع</th><th>العدد</th><th>الحالة في M2</th></tr></thead>
+    <tbody>
+      <tr><td>صوت (ogg، mpeg، m4a، mp4 صوتي، wma، amr، wav، opus)</td><td class="k">9,793</td><td>داخل النطاق — ٢٬٩٢٦٫٦ ساعة، ١١٣٫٢ غيغابايت</td></tr>
+      <tr><td>صور (jpg، png، webp)</td><td class="k">1,231</td><td>خارج النطاق</td></tr>
+      <tr><td>مستندات (pdf، docx)</td><td class="k">342</td><td>خارج النطاق</td></tr>
+      <tr><td>فيديو (mp4، 3gpp)</td><td class="k">94</td><td><b>قرار مؤجَّل</b> — ٦٫٢ ساعة صوت داخلها</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>التصنيف يعتمد نوع المحتوى أو الامتداد، أيّهما دلّ: تيليجرام يرسل بعض الصوت بنوع <code>application/octet-stream</code> وبعضه بلا نوع أصلًا، والملف الغائب عن طابور M2 غائب أيضًا عن المقام الذي يُقاس عليه معيار الخروج (٩٩٪). لا حاوية غير صوتية في هذا الأرشيف تحمل امتدادًا صوتيًا، فالتوسعة آمنة — وقد أكّد المسح الحي أن العدد بقي ٩٬٧٩٣ بعدها.</p>
+  <div class="note warn"><b>قرار مطلوب قبل M3:</b> هل تُفرَّغ الساعات الست ونصف من الفيديو أيضًا؟ نصّ الخطة يقصر المرحلة على «بصمات الصوت الفريدة»، فاستُبعدت وأُعلن عنها بدل إسقاطها بصمت.</div>
+</section>
+
+<section id="live">
+  <h2><span class="num">§5</span> التحقق على النشر الحي</h2>
+  <p>لم يُكتفَ بالمحاكاة. هذه أربع تجارب جرت على Convex وR2 الحقيقيين:</p>
+  <div class="kv">
+    <div><b>مسار كامل على ملفات حقيقية</b><span>ثلاثة ملفات صوتية: تنزيل من R2 ← استدلال ← رفع التفريغ ← سجل <span class="k">done</span> يحمل المفتاح والمدة وعدد المقاطع والمراجعة المثبَّتة. تحقّقنا من الملفات الثلاثة في R2 ومن صفوفها الثلاثة في Convex.</span></div>
+    <div><b>التعافي من نافذة الانهيار</b><span>أُعيد صف إلى حالة «معلّق» مع بقاء ملفه في R2 — أي محاكاة انهيار وقع بين الرفع والكتابة. التشغيل التالي استردّ الملف وتحقّق منه ورقّاه في <b>سبع ثوانٍ</b> دون تحميل النموذج.</span></div>
+    <div><b>المصالحة في الاتجاهين</b><span>حُذف ملف تفريغ حقيقي من R2: أبلغ الأمر عنه ووسمه للإعادة وسجّل إخفاقًا. ثم أُعيد الملف: تحقّق منه الأمر وأصلح Convex إلى <span class="k">done</span>. لم يُحذف أي كائن أرشيفي في أي حال — الأيتام تُبلَّغ فقط.</span></div>
+    <div><b>القتل أثناء التشغيل</b><span>Ctrl-C بعد عشر دقائق من تشغيل حقيقي: أُطلق القفل، وكُتب سجل تشغيل بحالة <span class="k">interrupted</span> و٩٬٧٩٠ صفًا مفحوصًا، ولم يبقَ أي ملف مؤقت. الصفوف الخمسمئة التي طالبها التشغيل عادت قابلة للالتقاط بعد نافذة الخمس دقائق — تحقّقنا من ذلك على السجلات نفسها.</span></div>
+  </div>
+</section>
+
+<section id="tests">
+  <h2><span class="num">§6</span> الاختبارات</h2>
+  <p><code>tests/test_m2.py</code> — ثمانية عشر اختبارًا تعمل بلا إطار عمل، على Convex وR2 ومفرِّغ وهمية تحاكي سلوك الحقيقي. المهم فيها ليس «هل يفرّغ النموذج» بل ثلاثة أسئلة:</p>
+  <ul class="tasks">
+    <li class="done">تشغيل معاد لا يفعل شيئًا ولا يُحمّل النموذج أصلًا</li>
+    <li class="done">الملف الموجود في R2 يُستردّ دون استدلال، والملف الذي أنتجه إعداد آخر يُعاد ولا يُوثق به</li>
+    <li class="done">فشل الرفع لا يترك سجلًا بحالة <span class="k">done</span> أبدًا</li>
+    <li class="done">تعارض الأصل فشل مسجَّل، ولا يولّد هوية ثانية</li>
+    <li class="done">الإخفاق يُصرَّف أولًا في التشغيل التالي، ويُترك للبشر بعد خمس محاولات</li>
+    <li class="done">انفجار دفعة كاملة يُحمَّل على ملفاتها فلا تُعاد الدفعة نفسها إلى الأبد</li>
+    <li class="done">المصالحة: مفقود يُوسم، وموجود يُصلَح، ويتيم يُبلَّغ ولا يُحذف</li>
+    <li class="done">الوهميات مطابقة لتواقيع الدوال المنشورة فعلًا — يُفحص ذلك بقراءة ملفات Convex نفسها</li>
+  </ul>
+  <p class="sub">مجموع ما يمرّ الآن: ١٨ اختبار M2 + ١٦ اختبار M1 + اختبارات M0، مع فحص <code>ruff</code> و<code>tsc</code> نظيفين.</p>
+</section>
+
+<section id="review">
+  <h2><span class="num">§7</span> المراجعة وما أُصلح</h2>
+  <p>خضع الفرق لمراجعة كود مركّزة، وأسفرت عن خمس ملاحظات؛ عولجت أربع منها في هذا الالتزام:</p>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>الملاحظة</th><th>المعالجة</th></tr></thead>
+    <tbody>
+      <tr><td>خطأ على مستوى الدفعة كلها (نفاد ذاكرة، ملف يقتل فاكّ الترميز) كان يمرّ دون تسجيل، فتُعاد الدفعة ذاتها إلى الأبد بلا تقدّم</td><td>يُحمَّل الخطأ الآن على كل ملف في الدفعة، فيرفعه سقف المحاولات إلى صفحة العمليات بدل أن يدور في حلقة</td></tr>
+      <tr><td><code>reconcile</code> بلا قفل مرحلة، وكان يقرأ R2 قبل Convex — فقد يقلب صفًا أنهاه عامل يعمل بالتوازي إلى «فاشل»</td><td>صار يعمل تحت قفل المرحلة نفسه لأنه يعدّل الصفوف نفسها، ويقرأ Convex أولًا ثم R2، ويكتب سجل تشغيل في التاريخ</td></tr>
+      <tr><td>سجل نجح بعد إعادة محاولة كان يحتفظ بنص الإخفاق القديم، والسجل الفاشل يحتفظ بمؤشر إلى ملف غير موجود</td><td>الدالة الذرية تمسح الحقلين عند تغيّر الحالة، فيبقى الصف صادقًا</td></tr>
+      <tr><td>تصنيف الصوت كان يهمل الامتداد متى وُجد نوع محتوى، فيسقط صوت <code>octet-stream</code> من الطابور ومن مقام التغطية معًا</td><td>صار أيّ الدليلين كافيًا؛ والمسح الحي أثبت أن العدد لم يتغيّر في هذا الأرشيف</td></tr>
+      <tr><td><code>src/archive/glossary.py</code>: دالة تعيد بناء النص من الكلمات العربية وحدها، فتحذف الأرقام واللاتينية والترقيم وفواصل الأسطر</td><td><b>لم يُعالج ولم يُلتزم به</b> — الملف مسوّدة للمرحلة الثالثة كانت في الشجرة قبل هذا العمل ولا يستدعيها شيء. تُترك لصاحبها</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="rest">
+  <h2><span class="num">§8</span> ما تبقّى للخروج من المحطة</h2>
+  <p>معيار الخروج: ٩٩٪ فأكثر من بصمات الصوت الفريدة بحالة <span class="k">done</span> للإعداد الفعّال. التغطية الآن <b>٣ من ٩٬٧٩٣</b>.</p>
+  <ul class="tasks">
+    <li class="open">تشغيل الحملة حتى تمامها على جهاز المعالجة — نحو ١٢٤ ساعة، تُطلق بقرار صريح ويمكن قطعها واستئنافها في أي لحظة</li>
+    <li class="open">حسم مصير الساعات الست ونصف من الفيديو قبل M3</li>
+    <li class="open">بوابة الترميز الصوتي (Opus مقابل AAC) على أجهزة حقيقية</li>
+    <li class="open">تهيئة Meilisearch — تخصّ M4 لا M2</li>
+  </ul>
+  <div class="note stop"><b>تنبيه تشغيلي:</b> <code>archive transcribe</code> بلا وسائط يعني الحملة كاملة. استعمل <code>--limit</code> أو <code>--sha256</code> لأي تجربة قصيرة.</div>
+</section>
+
+<section id="cmds">
+  <h2><span class="num">§9</span> الأوامر</h2>
+  <pre class="tree">uv sync --extra gpu                   <i># torch + cohere-transcribe، على جهاز المعالجة فقط</i>
+archive transcribe                    <i># كل ما تبقّى، في دفعات من ٥٠٠</i>
+archive transcribe --limit 20         <i># تشغيل محدود</i>
+archive transcribe --batch-size 100   <i># دفعات أصغر = مساحة مؤقتة أقل</i>
+archive transcribe --sha256 &lt;sha&gt;     <i># ملف واحد بعينه</i>
+archive reconcile-artifacts --dry-run <i># ما الذي يختلف عليه Convex وR2</i>
+archive gates                         <i># بوابات M0 — سبع تمرّ، اثنتان معلّقتان</i></pre>
+  <p class="sub">المساحة المؤقتة القصوى = حجم الدفعة × حجم الملف، أي نحو خمسة غيغابايت عند ٥٠٠ درس؛ تُخفَّض بـ<code>--batch-size</code>. المجلد المؤقت يُمسح في بداية كل تشغيل ونهايته، وكل ملف يُحذف فور رفع تفريغه.</p>
+</section>
+
+</main>
+</div>
+
+<footer>
+  <span>أرشيف تيليجرام المعرفي — تقرير المحطة الثانية</span>
+  <span>مصدر الأرقام: <code>m0.gates.json</code> ومسح حي لنشر Convex وR2 · commit 58ea0a4</span>
+</footer>
+</div>
+</html>
