@@ -7,6 +7,11 @@ requires-python = ">=3.11"
 # only ships zstd from Python 3.14 (this project runs on 3.11).
 dependencies = ["boto3", "telethon", "zstandard"]
 
+[project.optional-dependencies]
+# The M2 GPU stage only. `uv sync --extra gpu` on the machine that transcribes;
+# it pulls torch, and nothing before Phase 2 needs it.
+gpu = ["cohere-transcribe==0.1.4"]
+
 [project.scripts]
 archive = "archive.cli:main"
 

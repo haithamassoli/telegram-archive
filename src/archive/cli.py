@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import gates, ingest, legacy, telegram, verify
+from . import gates, ingest, legacy, telegram, transcribe, verify
 from .config import CONFIG_HASH, M1_CHANNELS, PINNED_CONFIG, canonical_json
 
 STATUS_MARK = {"pass": "PASS", "fail": "FAIL", "pending": "PEND"}
@@ -92,11 +92,13 @@ def cmd_bench(args) -> int:
     transcriber = Transcriber(options)
     try:
         run = transcriber.transcribe([str(p) for p in args.audio])
+        # While the model is still resident: MPS has no peak counter, and after
+        # close() the driver reading is 0.03 GB of nothing.
+        peak_gb, peak_source = _peak_memory(run.statistics)
     finally:
         transcriber.close()
     stats = run.statistics
     rtf_x = stats.real_time_factor_x
-    peak_gb, peak_source = _peak_memory(stats)
     record = (
         json.loads(gates.RECORD_PATH.read_text()) if gates.RECORD_PATH.is_file() else {}
     )
@@ -176,6 +178,37 @@ def cmd_verify_archive(args) -> int:
     return 1 if failed else 0
 
 
+def cmd_transcribe(args) -> int:
+    """M2: every unique audio binary to a `done` part transcript."""
+    from .pipeline import StageBusy
+
+    try:
+        result = transcribe.transcribe(
+            limit=args.limit, batch_size=args.batch_size, sha256s=tuple(args.sha256)
+        )
+    except StageBusy as exc:
+        print(f"not started: {exc}")
+        return 1
+    print(
+        f"{result['transcribed']} transcribed, {result['recovered']} recovered, "
+        f"{result['failed']} failed — {result['doneNow']}/{result['audio']} audio "
+        f"binaries done ({result['coverageNow']:.2%})"
+    )
+    return 1 if result["failed"] else 0
+
+
+def cmd_reconcile(args) -> int:
+    """§4.4 for part transcripts: Convex and R2 told to agree, or to complain."""
+    from .pipeline import StageBusy
+
+    try:
+        result = transcribe.reconcile(dry_run=args.dry_run)
+    except StageBusy as exc:
+        print(f"not started: {exc}")
+        return 1
+    return 1 if result["missing"] or result["invalid"] else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="archive")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -241,6 +274,31 @@ def main(argv: list[str] | None = None) -> int:
         "--checks", type=int, default=verify.SPOT_CHECKS, help="random spot-checks"
     )
     check.set_defaults(func=cmd_verify_archive)
+
+    asr = sub.add_parser("transcribe", help="M2: transcribe every audio binary")
+    asr.add_argument("--limit", type=int, help="stop after N files this run")
+    asr.add_argument(
+        "--batch-size",
+        type=int,
+        default=transcribe.BATCH,
+        help=f"files per transcriber call (default {transcribe.BATCH})",
+    )
+    asr.add_argument(
+        "--sha256",
+        action="append",
+        default=[],
+        metavar="SHA",
+        help="only this binary; repeatable",
+    )
+    asr.set_defaults(func=cmd_transcribe)
+
+    fix = sub.add_parser(
+        "reconcile-artifacts", help="§4.4: make Convex and R2 agree on transcripts"
+    )
+    fix.add_argument(
+        "--dry-run", action="store_true", help="report the drift, write nothing"
+    )
+    fix.set_defaults(func=cmd_reconcile)
 
     args = parser.parse_args(argv)
     return args.func(args)

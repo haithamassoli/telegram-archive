@@ -153,3 +153,48 @@ export const mediaForMessage = query({
     return out;
   },
 });
+
+// M2 selection (§4.2/§4.3): one page of unique binaries in sha256 order, each
+// carrying its part-transcript row for the active configHash. sha256 order makes
+// the scan resumable, and joining the transcript here is what lets a worker take
+// the fast path without a second round trip per object.
+export const mediaObjectsPage = query({
+  args: { configHash: v.string(), cursor: v.string(), limit: v.number() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("mediaObjects")
+      .withIndex("by_sha256", (q) => q.gt("sha256", args.cursor))
+      .take(args.limit);
+    const objects = [];
+    for (const row of rows) {
+      const found = await ctx.db
+        .query("partTranscripts")
+        .withIndex("by_sha256_config", (q) =>
+          q.eq("sha256", row.sha256).eq("configHash", args.configHash),
+        )
+        .collect();
+      if (found.length > 1) {
+        throw new Error(
+          `integrity error: ${found.length} rows for unique partTranscripts.(${row.sha256},${args.configHash})`,
+        );
+      }
+      const transcript = found[0] ?? null;
+      objects.push({
+        sha256: row.sha256,
+        r2Key: row.r2Key,
+        ext: row.ext,
+        mimeType: row.mimeType ?? null,
+        durationMs: row.durationMs ?? null,
+        sizeBytes: row.sizeBytes,
+        status: transcript?.status ?? null,
+        processingStartedAt: transcript?.processingStartedAt ?? null,
+        attempts: transcript?.attempts ?? 0,
+        rawR2Key: transcript?.rawR2Key ?? null,
+      });
+    }
+    return {
+      objects,
+      nextCursor: rows.length ? rows[rows.length - 1].sha256 : null,
+    };
+  },
+});

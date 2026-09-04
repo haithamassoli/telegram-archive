@@ -37,6 +37,8 @@ archive telegram-login                       # interactive first login (needs a 
 archive bench <audio...> --archive-hours 900 # GPU benchmark -> m0.gates.json
 archive sync                                 # M1: archive the in-scope channels
 archive verify-archive                       # M1 exit criteria; exit 1 until met
+archive transcribe                           # M2: every audio binary -> a done part transcript
+archive reconcile-artifacts                  # §4.4: make Convex and R2 agree
 ```
 
 ## M1 — the archive (`archive sync`)
@@ -59,6 +61,32 @@ approved in the Telegram app — until then it answers with a 24-hour delay and
 `archive sync` says so. One run per stage at a time: a local `flock` plus the
 `pipelineLocks` row, whose heartbeat has to go stale (5 min) before another
 machine can take over.
+
+## M2 — the transcripts (`archive transcribe`)
+
+The GPU is the clock, so the whole design is about never spending it twice. Each
+run scans every unique binary once, and a file reaches the model only after two
+cheaper gates say it must: a `done` Convex row for the active `configHash` is
+skipped outright (§4.2), and a row that is not done but whose deterministic
+artifact key already exists in R2 is fetched, validated against the pinned
+config, and promoted to `done` without inference (§4.3).
+
+```sh
+uv sync --extra gpu                   # torch + cohere-transcribe; the GPU host only
+archive transcribe                    # everything still pending, in batches of 500
+archive transcribe --limit 20         # bounded run
+archive transcribe --batch-size 100   # smaller batches = less scratch disk
+archive transcribe --sha256 <sha>     # one binary
+archive reconcile-artifacts --dry-run # what Convex and R2 disagree about
+```
+
+A transcript is written to `transcripts/{sha256}/{configHash}.json` **before**
+its Convex row flips to `done` (§4.1), so a `done` row always has its artifact
+behind it. The artifact records its own model, revision, language, vad, merge
+and timing; `validate_artifact` compares all six against the pin, and a mismatch
+is a failure rather than a new identity — nothing another config produced ever
+gets filed under this one's key. Video containers (94 objects, 6.2 h) are out of
+scope by the plan's wording and are reported, not silently dropped.
 
 ## The pinned config (§0.5)
 

@@ -84,6 +84,13 @@ export const upsertPartTranscript = mutation({
       status,
       ...rest,
       ...(status === "processing" ? { processingStartedAt: Date.now() } : {}),
+      // A row that succeeded on retry must not keep the old failure text, and a
+      // row that failed must not keep pointing at an artifact that is not there.
+      // `undefined` in a patch removes the field.
+      ...(status === "done" ? { error: undefined } : {}),
+      ...(status === "failed" && rest.rawR2Key === undefined
+        ? { rawR2Key: undefined }
+        : {}),
     };
     if (existing === null) {
       const id = await ctx.db.insert("partTranscripts", {
