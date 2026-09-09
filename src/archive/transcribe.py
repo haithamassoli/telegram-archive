@@ -273,6 +273,16 @@ def open_transcriber():
     return Transcriber(
         TranscriptionOptions(
             **transcriber_kwargs(),
+            # Not `auto`. On a T4 `torch.cuda.is_bf16_supported()` answers True
+            # through its emulation check — allocating a bfloat16 tensor works on
+            # compute 7.5, computing on one has no tensor cores behind it — so
+            # `auto` picks bf16 and runs it emulated. fp16 is also what the MPS
+            # half of this archive was transcribed in, so the corpus stays one
+            # thing. dtype is not one of the six pinned fields, so this does not
+            # touch transcript identity.
+            # ponytail: a constant, not a setting. Make it a flag the day this
+            # runs on a card with real bf16 (Ampere or newer).
+            dtype="fp16",
             publication=PublicationOptions(
                 formats=("json",),
                 output_dir=str(OUT_DIR),
