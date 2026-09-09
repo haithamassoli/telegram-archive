@@ -178,13 +178,25 @@ def cmd_verify_archive(args) -> int:
     return 1 if failed else 0
 
 
+def _shard(text: str) -> tuple[int, int]:
+    """`--shard 0/2` -> (0, 2)."""
+    index, _, count = text.partition("/")
+    i, n = int(index), int(count)
+    if n < 1 or not 0 <= i < n:
+        raise argparse.ArgumentTypeError(f"expected I/N with 0 <= I < N, got {text!r}")
+    return i, n
+
+
 def cmd_transcribe(args) -> int:
     """M2: every unique audio binary to a `done` part transcript."""
     from .pipeline import StageBusy
 
     try:
         result = transcribe.transcribe(
-            limit=args.limit, batch_size=args.batch_size, sha256s=tuple(args.sha256)
+            limit=args.limit,
+            batch_size=args.batch_size,
+            sha256s=tuple(args.sha256),
+            shard=args.shard,
         )
     except StageBusy as exc:
         print(f"not started: {exc}")
@@ -294,6 +306,12 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=transcribe.BATCH,
         help=f"files per transcriber call (default {transcribe.BATCH})",
+    )
+    asr.add_argument(
+        "--shard",
+        type=_shard,
+        metavar="I/N",
+        help="take only shard I of N (0-based) — one per GPU, run them side by side",
     )
     asr.add_argument(
         "--sha256",

@@ -11,6 +11,7 @@ a transcriber that writes the same JSON shape cohere-transcribe publishes.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import re
@@ -814,6 +815,30 @@ def test_slim_published_keeps_one_copy_of_the_implementation_block():
     assert len(result["implementations"]) == 1, "identical blocks must collapse to one"
     kept = json.loads(world.s3.objects[result["implementations"][0]])
     assert kept == fat_artifact()["implementation"]
+
+
+def test_shards_split_the_archive_into_disjoint_wholes():
+    shas = [hashlib.sha256(str(i).encode()).hexdigest() for i in range(500)]
+    for count in (2, 3, 4):
+        picked = [
+            [s for s in shas if transcribe.in_shard(s, (i, count))]
+            for i in range(count)
+        ]
+        flat = [s for group in picked for s in group]
+        assert sorted(flat) == sorted(shas), "every binary belongs to exactly one shard"
+        assert len(set(flat)) == len(flat), "no binary belongs to two shards"
+        assert all(group for group in picked), "every shard gets work"
+    assert all(transcribe.in_shard(s, None) for s in shas), "unsharded takes it all"
+
+
+def test_each_shard_gets_its_own_scratch_dir():
+    transcribe._use_scratch((1, 2))
+    one = transcribe.TMP_DIR
+    transcribe._use_scratch((0, 2))
+    assert transcribe.TMP_DIR != one, "shards must not share a scratch dir"
+    assert transcribe.OUT_DIR == transcribe.TMP_DIR / "out"
+    transcribe._use_scratch(None)
+    assert transcribe.TMP_DIR == transcribe.SCRATCH / "asr", "and it resets"
 
 
 def main() -> int:

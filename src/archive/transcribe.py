@@ -33,7 +33,8 @@ FAILURE_ATTEMPT_CAP = 5  # §4.6 — past this a sha256 waits for a human
 STALE_PROCESSING_MS = 5 * 60 * 1000  # §4.3, same window as the stage lock
 PREFIX = "transcripts/"
 IMPL_PREFIX = "meta/implementation/"
-TMP_DIR = REPO_ROOT / ".tmp" / "asr"
+SCRATCH = REPO_ROOT / ".tmp"
+TMP_DIR = SCRATCH / "asr"
 OUT_DIR = TMP_DIR / "out"
 
 # Fallback for the rare binary Telegram handed over without a mime type.
@@ -162,6 +163,36 @@ def validate_artifact(data: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # selection
 # --------------------------------------------------------------------------- #
+
+
+def in_shard(sha256: str, shard: tuple[int, int] | None) -> bool:
+    """Whether this sha256 belongs to shard `i of n`.
+
+    The sha256 is already a uniform hash, so its first bytes modulo `n` split
+    the archive into `n` disjoint sets that together are the whole of it. Two
+    workers on the same `n` therefore never select the same binary, which is
+    what lets a Kaggle session drive both of its T4s at once.
+    """
+    if shard is None:
+        return True
+    index, count = shard
+    return int(sha256[:8], 16) % count == index
+
+
+def _use_scratch(shard: tuple[int, int] | None) -> None:
+    """Give this process its own scratch dir, so shards cannot wipe each other.
+
+    Every run clears its scratch on entry; sharing one directory would mean the
+    second worker deleting the first one's half-downloaded batch.
+
+    ponytail: module globals instead of threading a path through five
+    signatures — one process runs one shard, and this is computed from a
+    constant so calling it twice is not cumulative.
+    """
+    global TMP_DIR, OUT_DIR
+    name = "asr" if shard is None else f"asr-{shard[0]}of{shard[1]}"
+    TMP_DIR = SCRATCH / name
+    OUT_DIR = TMP_DIR / "out"
 
 
 def scan(config_hash: str = CONFIG_HASH, page: int = SCAN_PAGE):
@@ -346,12 +377,25 @@ def transcribe(
     batch_size: int = BATCH,
     sha256s: tuple[str, ...] = (),
     config_hash: str = CONFIG_HASH,
+    shard: tuple[int, int] | None = None,
     log=_log,
 ) -> dict:
-    """M2's batch command: drive every un-transcribed audio binary to `done`."""
+    """M2's batch command: drive every un-transcribed audio binary to `done`.
+
+    With `shard=(i, n)` this run takes only its own `n`th of the archive, under
+    its own stage lock and its own scratch dir — so `n` of these can run side by
+    side, one per GPU. Failures stay filed under the unsharded stage name, so a
+    sharded run drains what an unsharded one failed and `reconcile-artifacts`
+    still sees every one of them.
+
+    ponytail: the shard locks are separate names, so `reconcile-artifacts` is no
+    longer excluded by a running shard. Do not run it while shards are live.
+    """
     from . import pipeline
 
-    with pipeline.stage(STAGE) as counts:
+    _use_scratch(shard)
+    lock = STAGE if shard is None else f"{STAGE}-{shard[0]}of{shard[1]}"
+    with pipeline.stage(lock) as counts:
         # ponytail: the whole batch is materialized before inference, so peak
         # scratch is batch_size x file size (~5 GB at 500 lesson-sized parts).
         # Lower --batch-size if the disk is smaller than that.
@@ -369,6 +413,8 @@ def transcribe(
 
         rows = list(scan(config_hash))
         stats = coverage(rows, config_hash)
+        if shard is not None:
+            log(f"shard {shard[0]} of {shard[1]}")
         log(
             f"{stats['audio']} unique audio binaries, {stats['done']} already done "
             f"({stats['coverage']:.1%}), {stats['notAudio']} non-audio object(s) skipped"
@@ -382,6 +428,7 @@ def transcribe(
             for row in rows
             if is_audio(row)
             and needs_work(row)
+            and in_shard(row["sha256"], shard)
             and row["sha256"] not in capped
             and (not wanted or row["sha256"] in wanted)
         ]

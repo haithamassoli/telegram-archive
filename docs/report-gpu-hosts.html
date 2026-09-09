@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>كاجل أم كولاب — تقرير اختيار منصة التفريغ · أرشيف تيليجرام المعرفي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#EFF2F0; --surface:#FFFFFF; --surface-2:#F6F8F7;
+    --ink:#14201D; --ink-soft:#3E4F4A; --muted:#687974;
+    --line:#DDE4E1; --line-strong:#C4CFCB;
+    --accent:#0E6B58; --accent-soft:#E2F0EB; --accent-ink:#0A4C3F;
+    --brass:#8A6A2A; --brass-soft:#F4EEDF;
+    --alert:#A33227; --alert-soft:#F8E7E4;
+    --shadow:0 1px 2px rgba(20,32,29,.05), 0 8px 24px -16px rgba(20,32,29,.25);
+    --serif:"Amiri", "Times New Roman", serif;
+    --sans:"IBM Plex Sans Arabic", "Segoe UI", system-ui, sans-serif;
+    --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1614; --surface:#161F1D; --surface-2:#1B2523;
+      --ink:#E4EBE8; --ink-soft:#B6C4C0; --muted:#8A9A95;
+      --line:#26332F; --line-strong:#35443F;
+      --accent:#54C0A4; --accent-soft:#12302A; --accent-ink:#8FD9C4;
+      --brass:#C9A75E; --brass-soft:#2C2718;
+      --alert:#E08376; --alert-soft:#33201C;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1614; --surface:#161F1D; --surface-2:#1B2523;
+    --ink:#E4EBE8; --ink-soft:#B6C4C0; --muted:#8A9A95;
+    --line:#26332F; --line-strong:#35443F;
+    --accent:#54C0A4; --accent-soft:#12302A; --accent-ink:#8FD9C4;
+    --brass:#C9A75E; --brass-soft:#2C2718;
+    --alert:#E08376; --alert-soft:#33201C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+
+  body{background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.75; -webkit-font-smoothing:antialiased;}
+  .page{direction:rtl; max-width:1180px; margin:0 auto; padding:0 24px 96px;}
+  *{box-sizing:border-box;}
+  h1,h2,h3,h4{font-family:var(--serif); font-weight:700; text-wrap:balance; line-height:1.35; margin:0;}
+  p{margin:0;}
+  a{color:var(--accent-ink); text-decoration-color:var(--line-strong); text-underline-offset:3px;}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:4px;}
+  code,.mono,.k{font-family:var(--mono); font-size:.86em; direction:ltr; unicode-bidi:isolate;}
+  code{background:var(--surface-2); border:1px solid var(--line); border-radius:5px; padding:.05em .35em;}
+
+  /* ---- masthead ---- */
+  .masthead{padding:64px 0 40px; border-bottom:1px solid var(--line);}
+  .eyebrow{font-size:.78rem; letter-spacing:.16em; color:var(--muted); font-weight:600;}
+  .masthead h1{font-size:clamp(2.4rem,5.5vw,3.6rem); margin:14px 0 10px;}
+  .lede{font-size:1.12rem; color:var(--ink-soft); max-width:62ch;}
+  .badges{display:flex; flex-wrap:wrap; gap:8px; margin-top:22px;}
+  .badge{font-size:.78rem; font-weight:600; padding:5px 11px; border-radius:999px; border:1px solid var(--line-strong); color:var(--ink-soft); background:var(--surface);}
+  .badge.frozen{background:var(--accent-soft); border-color:transparent; color:var(--accent-ink);}
+  .badge.mono{font-family:var(--mono); font-size:.72rem; font-weight:500;}
+
+  /* ---- metrics ---- */
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden; margin:36px 0 8px;}
+  .metric{background:var(--surface); padding:20px 18px;}
+  .metric .n{font-family:var(--serif); font-size:2.1rem; font-weight:700; line-height:1; font-variant-numeric:tabular-nums;}
+  .metric .l{font-size:.82rem; color:var(--muted); margin-top:8px;}
+
+  /* ---- layout ---- */
+  .shell{display:grid; grid-template-columns:1fr; gap:48px; margin-top:56px;}
+  @media(min-width:1000px){ .shell{grid-template-columns:230px 1fr; gap:56px;} }
+  nav.toc{align-self:start; font-size:.9rem;}
+  @media(min-width:1000px){ nav.toc{position:sticky; top:24px; max-height:calc(100vh - 48px); overflow:auto;} }
+  nav.toc ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  nav.toc a{display:block; padding:5px 10px; border-radius:6px; text-decoration:none; color:var(--ink-soft); border-right:2px solid transparent;}
+  nav.toc a:hover{background:var(--surface); color:var(--ink); border-right-color:var(--accent);}
+  nav.toc .tocgap{margin-top:14px; font-size:.74rem; letter-spacing:.14em; color:var(--muted); font-weight:600; padding:0 10px;}
+
+  main{min-width:0; display:flex; flex-direction:column; gap:56px;}
+  section{scroll-margin-top:20px; display:flex; flex-direction:column; gap:18px;}
+  section > h2{font-size:1.75rem; padding-bottom:12px; border-bottom:2px solid var(--ink); display:flex; align-items:baseline; gap:12px;}
+  section > h2 .num{font-family:var(--mono); font-size:.8rem; font-weight:500; color:var(--accent); letter-spacing:.05em;}
+  section p{max-width:68ch;}
+  h3{font-size:1.18rem;}
+  .sub{color:var(--muted); font-size:.92rem;}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:22px 24px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:12px;}
+  .cards{display:grid; gap:16px;}
+  @media(min-width:700px){ .cards.two{grid-template-columns:1fr 1fr;} }
+
+  ul.plain{margin:0; padding:0 1.2em 0 0; display:flex; flex-direction:column; gap:9px;}
+  ul.plain li{padding-inline-start:4px;}
+  ul.plain li::marker{color:var(--accent);}
+
+  /* ---- rules list ---- */
+  .rules{counter-reset:r; display:flex; flex-direction:column; gap:12px;}
+  .rule{display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px 18px;}
+  .rule .rn{counter-increment:r; font-family:var(--mono); font-size:.78rem; font-weight:500; color:var(--accent-ink); background:var(--accent-soft); width:26px; height:26px; border-radius:7px; display:grid; place-items:center;}
+  .rule .rn::before{content:counter(r);}
+  .rule b{display:block; margin-bottom:2px;}
+
+  /* ---- identity ladder ---- */
+  .ladder{display:flex; flex-direction:column; gap:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--surface);}
+  .rung{display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:14px 20px; border-bottom:1px solid var(--line);}
+  .rung:last-child{border-bottom:0;}
+  .rung .what{font-weight:600;}
+  .rung .id{font-family:var(--mono); font-size:.82rem; color:var(--accent-ink); background:var(--accent-soft); padding:4px 10px; border-radius:6px; direction:ltr; white-space:nowrap;}
+
+  /* ---- tables ---- */
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface);}
+  table{border-collapse:collapse; width:100%; min-width:520px; font-size:.93rem;}
+  th,td{text-align:right; padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top;}
+  thead th{background:var(--surface-2); font-size:.8rem; letter-spacing:.05em; color:var(--muted); font-weight:600; white-space:nowrap;}
+  tbody tr:last-child td{border-bottom:0;}
+  td .k{color:var(--accent-ink);}
+
+  /* ---- schema / tree blocks ---- */
+  pre.tree{margin:0; overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px 20px; direction:ltr; text-align:left; font-family:var(--mono); font-size:.82rem; line-height:1.85; color:var(--ink-soft);}
+  pre.tree b{color:var(--accent-ink); font-weight:500;}
+  pre.tree i{color:var(--muted); font-style:normal;}
+
+  /* ---- phases ---- */
+  .phase{display:grid; grid-template-columns:auto 1fr; gap:18px;}
+  .phase .spine{display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .phase .dot{width:34px; height:34px; border-radius:10px; background:var(--accent-soft); color:var(--accent-ink); display:grid; place-items:center; font-family:var(--mono); font-size:.8rem; font-weight:500; border:1px solid var(--line);}
+  .phase .line{flex:1; width:2px; background:var(--line);}
+  .phase:last-child .line{display:none;}
+  .phase .body{padding-bottom:26px; display:flex; flex-direction:column; gap:10px;}
+  .phase h3{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px;}
+  .phase h3 .cost{font-family:var(--sans); font-size:.78rem; font-weight:600; color:var(--brass); background:var(--brass-soft); padding:3px 9px; border-radius:999px;}
+
+  /* ---- milestones ---- */
+  .ms{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); overflow:hidden;}
+  .ms > summary{list-style:none; cursor:pointer; padding:18px 22px; display:grid; grid-template-columns:auto 1fr auto; gap:14px; align-items:center;}
+  .ms > summary::-webkit-details-marker{display:none;}
+  .ms .tag{font-family:var(--mono); font-size:.8rem; font-weight:500; color:var(--accent-ink); background:var(--accent-soft); padding:5px 9px; border-radius:7px;}
+  .ms .ttl{font-family:var(--serif); font-size:1.15rem; font-weight:700;}
+  .ms .count{font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap;}
+  .ms .count::after{content:" ▾"; color:var(--line-strong);}
+  .ms[open] .count::after{content:" ▴";}
+  .ms .inner{padding:0 22px 22px; display:flex; flex-direction:column; gap:16px; border-top:1px solid var(--line); margin-top:2px; padding-top:18px;}
+  .goal{display:grid; gap:10px;}
+  .goal div{display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:baseline;}
+  .goal span.lbl{font-size:.76rem; font-weight:700; letter-spacing:.08em; color:var(--muted); white-space:nowrap;}
+  ul.tasks{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px;}
+  ul.tasks li{display:grid; grid-template-columns:auto 1fr; gap:12px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:.95rem;}
+  ul.tasks li:last-child{border-bottom:0;}
+  ul.tasks li::before{content:""; width:15px; height:15px; margin-top:.4em; border:1.5px solid var(--line-strong); border-radius:4px; background:var(--surface-2);}
+  .subhead{font-size:.78rem; font-weight:700; letter-spacing:.08em; color:var(--brass); margin-top:6px;}
+
+  .note{background:var(--accent-soft); border-radius:10px; padding:16px 20px; color:var(--accent-ink); font-size:.95rem;}
+  .note.warn{background:var(--brass-soft); color:var(--brass);}
+  .note.stop{background:var(--alert-soft); color:var(--alert);}
+  .note b{font-weight:700;}
+
+  footer{margin-top:72px; padding-top:24px; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem; display:flex; flex-wrap:wrap; gap:8px 20px; justify-content:space-between;}
+  @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important;} }
+</style>
+<style>
+  .kv{display:grid; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  .kv > div{background:var(--surface); padding:14px 18px; display:grid; grid-template-columns:220px 1fr; gap:16px; align-items:baseline;}
+  .kv b{font-weight:600; color:var(--ink-soft); font-size:.9rem;}
+  @media(max-width:640px){ .kv > div{grid-template-columns:1fr;} }
+  .bar{display:grid; grid-template-columns:170px 1fr 92px; gap:14px; align-items:center; font-size:.9rem; padding:7px 0;}
+  .bar .track{height:16px; background:var(--surface-2); border:1px solid var(--line); border-radius:5px; overflow:hidden;}
+  .bar .fill{height:100%; background:var(--accent); border-radius:0;}
+  .bar .fill.dim{background:var(--line-strong);}
+  .bar .fill.brass{background:var(--brass);}
+  .bar .pct{font-family:var(--mono); font-size:.8rem; color:var(--ink-soft); text-align:left; direction:ltr;}
+  .bar .nm{font-family:var(--mono); font-size:.82rem; direction:ltr; text-align:right;}
+  .verdict{display:grid; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  .verdict > div{background:var(--surface); padding:18px 20px;}
+  .verdict .q{font-family:var(--serif); font-weight:700; font-size:1.06rem; margin-bottom:6px;}
+  .verdict .a{color:var(--ink-soft);}
+  .pick{border:2px solid var(--accent); box-shadow:none;}
+  .pick .tagline{font-size:.74rem; font-weight:700; letter-spacing:.1em; color:var(--accent-ink);}
+</style>
+<div class="page" dir="rtl" lang="ar">
+
+<header class="masthead">
+  <div class="eyebrow">تقرير قرار · أرشيف تيليجرام المعرفي</div>
+  <h1>كاجل أم كولاب؟</h1>
+  <p class="lede">الحملة أنصفُ ممّا تظنّ: الماك أنجز 4,531 ملفًا صوتيًا من 9,793، وبقي 5,262 ملفًا فيها 1,579.6 ساعة صوت. هذا المتبقّي صغير بما يكفي لأن تنهيه أيّ من المنصّتين — كاجل في ثلاث جلسات مجانية، وكولاب في يومين من حصّة تدفعها أصلًا. الفرق بينهما ليس السرعة، بل سؤال واحد: هل تستطيع إغلاق المتصفّح والذهاب للنوم؟</p>
+  <div class="badges">
+    <span class="badge frozen">الخطة v2.3 مجمّدة</span>
+    <span class="badge">المرحلة M2 · التفريغ</span>
+    <span class="badge mono">configHash d27d1fb0a633</span>
+    <span class="badge mono">قياس حيّ 2026-09-09</span>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="n">46.3٪</div><div class="l">أُنجز فعلًا (4,531 / 9,793)</div></div>
+    <div class="metric"><div class="n">5,262</div><div class="l">ملفًا صوتيًا متبقّيًا</div></div>
+    <div class="metric"><div class="n">1,579.6</div><div class="l">ساعة صوت متبقّية</div></div>
+    <div class="metric"><div class="n">61.7 GB</div><div class="l">تنزيل من R2 (بلا كلفة خروج)</div></div>
+    <div class="metric"><div class="n">18.0 د</div><div class="l">متوسّط طول الملف المتبقّي</div></div>
+    <div class="metric"><div class="n">500</div><div class="l">صفًّا عالقًا في <code>processing</code></div></div>
+  </div>
+</header>
+
+<div class="shell">
+<nav class="toc">
+  <ol>
+    <li><a href="#verdict">١ · الحكم</a></li>
+    <li><a href="#now">٢ · أين نحن الآن</a></li>
+    <li><a href="#diff">٣ · الفرق بين المنصّتين</a></li>
+    <li><a href="#math">٤ · الحساب لحالتك</a></li>
+    <li><a href="#safe">٥ · لماذا لا نخاف القتل</a></li>
+    <li><a href="#parallel">٦ · نرفع بالتوازي أم في النهاية؟</a></li>
+    <div class="tocgap">التنفيذ</div>
+    <li><a href="#kaggle">٧ · كاجل خطوة بخطوة</a></li>
+    <li><a href="#colab">٨ · كولاب خطوة بخطوة</a></li>
+    <li><a href="#practice">٩ · أفضل الممارسات</a></li>
+    <li><a href="#done">١٠ · عندما تنتهي</a></li>
+    <li><a href="#trouble">١١ · الأعطال المتوقّعة</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="verdict">
+  <h2><span class="num">٠١</span> الحكم</h2>
+  <p>لا تحتاج إلى تقرير لتقرّر، تحتاج إلى فحص واحد يستغرق عشر ثوانٍ: افتح كولاب، واذهب إلى قائمة <code>Runtime</code>، وابحث عن <b>Background execution</b>.</p>
+
+  <div class="cards two">
+    <div class="card pick">
+      <div class="tagline">التوصية الافتراضية</div>
+      <h3>كاجل</h3>
+      <p>ثلاث جلسات، كلّ واحدة اثنتا عشرة ساعة، تُطلقها بزرّ <code>Save &amp; Run All</code> ثم تغلق الحاسوب. مجّانية، وحصّتها تتجدّد كلّ أسبوع فلا يمكن أن تنفد وتتركك عند ٨٠٪. وميزة لم أتوقّعها حين بدأت: بطاقة T4 لا تدعم bf16، فيحسم النموذج نوعه إلى <b>fp16</b> — وهو بالضبط ما فرّغ به الماك النصف الأول.</p>
+    </div>
+    <div class="card">
+      <h3>كولاب — بشرط واحد</h3>
+      <p>إن ظهر لك مفتاح <b>Background execution</b> فكولاب أفضل: بطاقة L4 تنهي المتبقّي في نحو ١٥ ساعة، من حصّة تدفع ثمنها في اشتراك Google AI Pro أصلًا. وإن لم يظهر المفتاح، فالثمن أن يبقى التبويب مفتوحًا والحاسوب مستيقظًا ثماني ساعات متّصلة، مرّتين.</p>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <div><div class="q">أيّهما أسرع؟</div><div class="a">كولاب على L4: نحو ١٣–١٨ ساعة GPU مقابل ٣٢–٤٠ على T4 في كاجل. لكن سقف كاجل الأسبوعي ٣٠ ساعة، فالفارق في الزمن الحقيقي هو يومان مقابل عشرة أيام.</div></div>
+    <div><div class="q">أيّهما أرخص؟</div><div class="a">كاجل، لأنه صفر. كولاب سيلتهم نحو ٧٠ وحدة من مئة وحدة شهرية — لن يكلّفك مالًا إضافيًّا، لكنه يلتهم مخصّصك الشهري كلّه تقريبًا.</div></div>
+    <div><div class="q">أيّهما أضمن؟</div><div class="a">كاجل. حصّته تتجدّد أسبوعيًّا ولا تنفد نهائيًّا، وتشغيله لا يحتاج متصفّحًا مفتوحًا، ونوع أرقامه مطابق لما فُرّغ به النصف الأول.</div></div>
+    <div><div class="q">وإن أردت الحسم بلا فحص؟</div><div class="a">كاجل. الفارق عشرة أيام من الانتظار مقابل حملة لا تحتاج أن تجلس عندها.</div></div>
+  </div>
+</section>
+
+<section id="now">
+  <h2><span class="num">٠٢</span> أين نحن الآن</h2>
+  <p>هذه أرقام قُرئت من Convex قبل كتابة هذا التقرير، لا من الوثائق. الوثائق كانت تقول إنّ المنجَز ثلاثة ملفات؛ الماك تقدّم كثيرًا منذ ذلك السطر.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>القياس</th><th>القيمة</th><th>ما يعنيه</th></tr></thead>
+    <tbody>
+      <tr><td>ثنائيات صوتية فريدة</td><td class="k">9,793</td><td>مقام معيار الخروج (≥٩٩٪)</td></tr>
+      <tr><td>منجَزة <code>done</code></td><td class="k">4,531 · 46.3٪</td><td>‏1,347 ساعة صوت فُرّغت على الماك</td></tr>
+      <tr><td>متبقّية</td><td class="k">5,262</td><td>‏4,762 بلا صفّ + 500 عالقة</td></tr>
+      <tr><td>ساعات الصوت المتبقّية</td><td class="k">1,579.6</td><td>هي وحدها ما يحدّد الكلفة</td></tr>
+      <tr><td>حجم التنزيل من R2</td><td class="k">61.7 GB</td><td>خروج R2 بلا رسوم — التنزيل مجاني</td></tr>
+      <tr><td>متوسّط الملف</td><td class="k">18.0 دقيقة · 11.7 MB</td><td>درس كامل، لا رسالة صوتية</td></tr>
+      <tr><td>صفوف <code>processing</code></td><td class="k">500</td><td>بقايا الجولة المقاطَعة</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note"><b>الخمسمئة العالقة ليست عملًا إضافيًّا.</b> نافذة التقادم خمس دقائق: أيّ صفّ <code>processing</code> أقدم منها يُعدّ متروكًا ويُلتقط تلقائيًّا في أوّل مسح. لا تفعل بها شيئًا.</div>
+
+  <p>القياس الوحيد الموثّق للسرعة في هذا المشروع هو <b>23.5×</b> على بطاقة الماك (‏<code>m0.gates.json</code>). أي أنّ الماك وحده يحتاج ٦٧ ساعة أخرى — قرابة ثلاثة أيام متواصلة — لإنهاء ما بقي. كلّ رقم آخر في هذا التقرير عن T4 وL4 هو <b>تقدير</b>، وأوّل جلسة لك ستحوّله إلى قياس.</p>
+</section>
+
+<section id="diff">
+  <h2><span class="num">٠٣</span> الفرق بين المنصّتين</h2>
+  <p>المنصّتان تشغّلان نفس العامل بنفس الأمر. الفرق كلّه في ثلاثة أسطر من هذا الجدول: الحصّة، وأقصى جلسة، وهل تعمل بلا متصفّح.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>الوجه</th><th>Kaggle</th><th>Colab (Google AI Pro)</th></tr></thead>
+    <tbody>
+      <tr><td><b>الحصّة</b></td><td>~٣٠ ساعة GPU أسبوعيًّا، <b>تتجدّد</b></td><td>~١٠٠ وحدة حوسبة شهريًّا، تنفد ثم تنتظر</td></tr>
+      <tr><td><b>أقصى جلسة</b></td><td>١٢ ساعة</td><td>حتى ٢٤ ساعة نظريًّا</td></tr>
+      <tr><td><b>بلا متصفّح</b></td><td><b>نعم</b> — ‎<code>Save &amp; Run All</code> يعمل بلا تبويب</td><td>‏<b>Pro+ / Ultra فقط</b> — افحص قائمة Runtime</td></tr>
+      <tr><td><b>البطاقة</b></td><td>‏T4 ×2 (نستعمل واحدة) أو P100</td><td>‏T4 أو L4 أو A100</td></tr>
+      <tr><td><b>نوع الأرقام</b></td><td>‏fp16 — مطابق للنصف المنجَز</td><td>‏L4/A100 تحسم إلى bf16</td></tr>
+      <tr><td><b>القرص</b></td><td>‏<code>/kaggle/temp</code> — عشرات الغيغابايت</td><td>‏<code>/content</code> — أوسع</td></tr>
+      <tr><td><b>الأسرار</b></td><td>‏Add-ons → Secrets</td><td>أيقونة المفتاح في الشريط الجانبي</td></tr>
+      <tr><td><b>الإنترنت</b></td><td>يحتاج توثيق رقم الهاتف مرّة</td><td>مفعّل دائمًا</td></tr>
+      <tr><td><b>الكلفة</b></td><td>صفر</td><td>ضمن اشتراك تدفعه أصلًا</td></tr>
+      <tr><td><b>عند انقطاع الجلسة</b></td><td colspan="2">تخسر الدفعة الجارية فقط — عشر دقائق بحجم الدفعة الموصى به</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note warn"><b>الحصّة تُحسب بالوقت المتّصل، لا بوقت الـGPU.</b> جلسة مفتوحة لا تفرّغ شيئًا تحرق حصّتك على المنصّتين. أغلق البيئة فور انتهاء الأمر.</div>
+</section>
+
+<section id="math">
+  <h2><span class="num">٠٤</span> الحساب لحالتك</h2>
+  <p>‏1,579.6 ساعة صوت مقسومة على معامل السرعة تعطي ساعات الـGPU. البقيّة قسمة على الحصّة.</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>الخيار</th><th>السرعة</th><th>ساعات GPU</th><th>ما يستهلكه</th><th>الزمن الحقيقي</th></tr></thead>
+    <tbody>
+      <tr><td>الماك (M-series)</td><td class="k">23.5× مقيسة</td><td>‏67 ساعة</td><td>كهرباء وحاسوبك</td><td>~2.8 يوم متواصل</td></tr>
+      <tr><td><b>كاجل — T4</b></td><td class="k">~40–50× تقدير</td><td>‏32–40 ساعة</td><td>‏٣ جلسات، ضمن حصّتين أسبوعيّتين</td><td><b>~10 أيام</b></td></tr>
+      <tr><td><b>كولاب — L4</b></td><td class="k">~90–120× تقدير</td><td>‏13–18 ساعة</td><td>‏<b>65–90 وحدة من 100</b></td><td><b>~يومان</b></td></tr>
+      <tr><td>كولاب — T4</td><td class="k">~40–50× تقدير</td><td>‏32–40 ساعة</td><td>‏65–80 وحدة — نفس الثمن، ضعف الوقت</td><td>~4 أيام</td></tr>
+      <tr><td>كولاب — A100</td><td class="k">أسرع</td><td>‏7–9 ساعات</td><td>‏<b>~110 وحدة — أكثر من حصّتك</b></td><td>لا تفعل</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>لاحظ السطر الأخير: الوحدات تُحسب بالساعة لا بالعمل، ورسوم A100 نحو ثلاثة أضعاف L4 مقابل أقلّ من ثلاثة أضعاف الإنتاجية. البطاقة الأسرع هي الخيار الأغلى، لا الأذكى.</p>
+
+  <div class="note"><b>حوّل التقدير إلى قياس في أوّل عشر دقائق.</b> شغّل الأمر مع <code>--limit 10</code>، ثمّ اقسم مجموع الدقائق التي يطبعها السجل على الزمن المنقضي. رقمك أنت أصدق من كلّ صفوف هذا الجدول.</div>
+</section>
+
+<section id="safe">
+  <h2><span class="num">٠٥</span> لماذا لا نخاف من قتل الجلسة</h2>
+  <p>سقف الاثنتي عشرة ساعة يبدو مشكلة، وهو ليس كذلك — لأنّ العامل صُمّم منذ البداية على أن يُقتل. حالته كلّها في Convex وR2، لا على القرص المحلّي.</p>
+
+  <div class="rules">
+    <div class="rule"><span class="rn"></span><div><b>قانون ترتيب الكتابة (§4.1)</b>الملف يُرفع إلى R2 أوّلًا، ثمّ يُكتب <code>done</code> في Convex. لا يوجد صفّ منجَز بلا ملف يقابله.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>المسار السريع (§4.2)</b>الصفّ المنجَز يُتخطّى بلا لمس R2 ولا الـGPU. الجلسة الثانية لا تعيد ما فعلته الأولى.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>نافذة الانهيار (§4.3)</b>ملفٌ رُفع إلى R2 قبل القتل مباشرةً يُتحقّق منه ويُرقّى إلى <code>done</code> بلا استدلال جديد. حتى الثواني الأخيرة قبل القتل ليست ضائعة.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>قفل المرحلة (§4.5)</b>عاملٌ واحد لكلّ مرحلة عبر كلّ الأجهزة. نبضة كلّ دقيقة، وتقادم بعد خمس؛ فجلسة ماتت لا تُوصد الطريق أمام التالية.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>الإخفاقات أوّلًا (§4.6)</b>ما أخفق يُقدَّم في الجولة التالية، وما تجاوز خمس محاولات يُرفع إلى الإنسان بدل أن يدور في حلقة.</div></div>
+  </div>
+
+  <p>النتيجة العملية: القتل يكلّف الدفعة الجارية وحدها. ولهذا تحديدًا كانت المنصّة المجانية المقطوعة خيارًا معقولًا أصلًا.</p>
+</section>
+
+<section id="parallel">
+  <h2><span class="num">٠٦</span> نفرّغ ثمّ نرفع الكلّ؟ أم بالتوازي؟</h2>
+  <p><b>بالتوازي — ملفًا ملفًا فور خروجه من البطاقة.</b> هذا ما يفعله الكود اليوم، وليس خيارًا قابلًا للانتقاش من موقع الأداء، لأنّ حسابه غير متكافئ:</p>
+
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th></th><th>الرفع بالتوازي (الحالي)</th><th>الرفع في النهاية</th></tr></thead>
+    <tbody>
+      <tr><td>كلفته من زمن الجلسة</td><td>‏&lt; ٥٪ — رفع ملف بضع مئات الكيلوبايت مقابل ٢٤ ثانية GPU للملف</td><td>صفر تقريبًا</td></tr>
+      <tr><td>ما تخسره عند القتل</td><td><b>الدفعة الجارية: ١٠ دقائق</b></td><td><b>الجلسة كاملة: حتى ١٢ ساعة</b></td></tr>
+      <tr><td>الجلسة التالية</td><td>تتخطّى المنجَز فورًا</td><td>تعيد كلّ شيء — لا صفوف <code>done</code> في Convex</td></tr>
+      <tr><td>القرص</td><td>يُنظَّف بعد كلّ ملف</td><td>يتراكم بلا داعٍ</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>تأجيل الرفع يشتري أقلّ من ٥٪ من الزمن، ويدفع ثمنه احتمالَ خسارة يوم كامل من الحوسبة. على منصّة تُقتل فيها الجلسة بالتصميم، هذه صفقة خاسرة بوضوح.</p>
+
+  <h3>الشيء الوحيد الذي تضبطه: حجم الدفعة</h3>
+  <p>الرفع يحدث بعد أن تخرج <b>الدفعة كاملة</b> من البطاقة، فحجم الدفعة هو حرفيًّا مقدار العمل المعرَّض للضياع:</p>
+  <div class="bar"><span class="nm">--batch-size 500</span><span class="track"><span class="fill brass" style="width:100%"></span></span><span class="pct">~3.3 س</span></div>
+  <div class="bar"><span class="nm">--batch-size 50</span><span class="track"><span class="fill dim" style="width:10%"></span></span><span class="pct">~20 د</span></div>
+  <div class="bar"><span class="nm">--batch-size 25</span><span class="track"><span class="fill" style="width:5%"></span></span><span class="pct">~10 د</span></div>
+  <p class="sub">‏٥٠٠ هو الافتراضي المضبوط لجهاز لا يُقتل. على كاجل وكولاب اختر <b>٢٥</b>: عشر دقائق هي أسوأ خسارة ممكنة، والثمن بضع ثوانٍ من إعادة تحميل بيانات الدفعة.</p>
+</section>
+
+<section id="kaggle">
+  <h2><span class="num">٠٧</span> كاجل خطوة بخطوة</h2>
+
+  <div class="phase"><div class="spine"><div class="dot">١</div><div class="line"></div></div><div class="body">
+    <h3>أوقف الماك أوّلًا</h3>
+    <p>‏Ctrl-C على الجولة الجارية، وانتظر خمس دقائق حتى يتقادم القفل إن كانت قد قُتلت قتلًا. جلستان معًا لن تتصادما — الثانية سترفض — لكنّك تكون قد أحرقت حصّة بلا عمل.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">٢</div><div class="line"></div></div><div class="body">
+    <h3>وثّق رقم هاتفك في كاجل</h3>
+    <p>بلا توثيق لا إنترنت في الدفتر، والعامل يحتاج ثلاث جهات: Convex وR2 وHugging Face. من إعدادات الحساب → <code>Phone Verification</code>.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">٣</div><div class="line"></div></div><div class="body">
+    <h3>جهّز السرّين على جهازك</h3>
+    <p>كلّ البيئة في سطر واحد، والرمز الشخصي لجيت-هَب في سطر آخر:</p>
+    <pre class="tree">cat .env .env.local | base64 | tr -d '\n' | pbcopy</pre>
+    <p class="sub">يلزم داخلها: <code>HF_TOKEN</code> وقيم <code>R2_*</code> الخمس و<code>CONVEX_URL</code>. جلسة تيليجرام لا تلزم — المرحلة M2 لا تلمس تيليجرام إطلاقًا.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">٤</div><div class="line"></div></div><div class="body">
+    <h3>دفتر جديد بإعداداته</h3>
+    <p>‏<code>New Notebook</code>، ثمّ من اللوحة اليمنى: المسرّع <code>GPU T4 ×2</code>، والإنترنت <code>On</code>. ومن <code>Add-ons → Secrets</code> أضف <code>ARCHIVE_ENV_B64</code> و<code>GITHUB_TOKEN</code>.</p>
+    <p class="sub">تُستعمل بطاقة واحدة من الاثنتين؛ اختيار T4 ×2 لا يكلّف حصّة إضافية. تجنّب P100: لا نوى موتّرة فيها لحساب fp16.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">٥</div><div class="line"></div></div><div class="body">
+    <h3>الخليّة الأولى — التجهيز</h3>
+    <pre class="tree">import base64, os, pathlib, subprocess, sys
+from kaggle_secrets import UserSecretsClient
+
+s = UserSecretsClient()
+ROOT = pathlib.Path(<i>"/kaggle/temp/telegram-archive"</i>)
+os.environ[<i>"HF_HOME"</i>] = <i>"/kaggle/temp/hf"</i>
+
+if not ROOT.exists():
+    token = s.get_secret(<i>"GITHUB_TOKEN"</i>)
+    subprocess.run([<i>"git"</i>, <i>"clone"</i>, <i>"--depth"</i>, <i>"1"</i>,
+        f<i>"https://{token}@github.com/&lt;user&gt;/telegram-archive.git"</i>, str(ROOT)], check=True)
+
+(ROOT / <i>".env"</i>).write_bytes(base64.b64decode(s.get_secret(<i>"ARCHIVE_ENV_B64"</i>)))
+subprocess.run([sys.executable, <i>"-m"</i>, <i>"pip"</i>, <i>"install"</i>, <i>"-q"</i>, <i>"uv"</i>], check=True)
+subprocess.run([<i>"uv"</i>, <i>"sync"</i>, <i>"--extra"</i>, <i>"gpu"</i>, <i>"--frozen"</i>], cwd=ROOT, check=True)</pre>
+    <p class="sub">‏<code>/kaggle/temp</code> لا يُحفظ مخرجًا للدفتر، فلا ينتفخ الحفظ بذاكرة النموذج ولا بالمسوّدات. و<code>uv sync --frozen</code> يعيد بناء نفس الإصدارات المقفلة في المستودع بالضبط، لا ما تصادف وجوده في صورة كاجل.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">٦</div><div class="line"></div></div><div class="body">
+    <h3>الخليّة الثانية — القياس أوّلًا</h3>
+    <pre class="tree">!cd /kaggle/temp/telegram-archive &amp;&amp; uv run archive transcribe --batch-size 25 --limit 10</pre>
+    <p>شغّلها تفاعليًّا مرّة واحدة. سترى سطر التغطية، ثمّ عشرة ملفات تُنجَز. من زمنها احسب سرعتك الحقيقية، ومنها تعرف كم جلسة تحتاج.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">٧</div><div class="line"></div></div><div class="body">
+    <h3>الحملة — بدّل الخليّة الثانية ثمّ <code>Save &amp; Run All</code></h3>
+    <pre class="tree">!cd /kaggle/temp/telegram-archive &amp;&amp; timeout -s INT 11h uv run archive transcribe --batch-size 25</pre>
+    <p>‏<code>timeout -s INT</code> يرسل نفس إشارة Ctrl-C قبل ساعة من سقف المنصّة، فتنتهي الجولة نهاية نظيفة: القفل يُفكّ، وسجلّ الجولة يُكتب. بلا هذه الحيلة تُقتل الجلسة في الساعة الثانية عشرة قتلًا خشنًا وتنتظر خمس دقائق تقادمًا.</p>
+    <p class="sub">‏<code>Save Version → Save &amp; Run All (Commit)</code>. بعدها أغلق التبويب واذهب؛ الجلسة التفاعلية تموت بموت المتصفّح، أمّا النسخة المحفوظة فتعمل وحدها.</p>
+  </div></div>
+
+  <div class="phase"><div class="spine"><div class="dot">٨</div><div class="line"></div></div><div class="body">
+    <h3>كرّر حتّى ≥٩٩٪</h3>
+    <p>جلسة كلّ يوم — أو جلستان حتّى تنفد حصّة الأسبوع. لا شيء تستأنفه يدويًّا بينها: أوّل سطر في كلّ جولة يخبرك بالتغطية الحالية، وهو مقياس تقدّمك الوحيد.</p>
+  </div></div>
+</section>
+
+<section id="colab">
+  <h2><span class="num">٠٨</span> كولاب خطوة بخطوة</h2>
+  <p>نفس العامل ونفس الأمر. ثلاثة فروق فقط:</p>
+  <ul class="plain">
+    <li>الأسرار من <code>google.colab.userdata</code> بدل <code>kaggle_secrets</code>، وتُضاف من أيقونة المفتاح في الشريط الجانبي مع تفعيل وصول الدفتر إليها.</li>
+    <li>المسار <code>/content</code> بدل <code>/kaggle/temp</code>.</li>
+    <li>‏<b>لا يوجد <code>Save &amp; Run All</code>.</b> إمّا أن يمنحك اشتراكك مفتاح Background execution، وإمّا أن يبقى التبويب مفتوحًا والجهاز مستيقظًا.</li>
+  </ul>
+
+  <pre class="tree">import base64, os, pathlib, subprocess, sys
+from google.colab import userdata
+
+ROOT = pathlib.Path(<i>"/content/telegram-archive"</i>)
+os.environ[<i>"HF_HOME"</i>] = <i>"/content/hf"</i>
+
+if not ROOT.exists():
+    token = userdata.get(<i>"GITHUB_TOKEN"</i>)
+    subprocess.run([<i>"git"</i>, <i>"clone"</i>, <i>"--depth"</i>, <i>"1"</i>,
+        f<i>"https://{token}@github.com/&lt;user&gt;/telegram-archive.git"</i>, str(ROOT)], check=True)
+
+(ROOT / <i>".env"</i>).write_bytes(base64.b64decode(userdata.get(<i>"ARCHIVE_ENV_B64"</i>)))
+subprocess.run([sys.executable, <i>"-m"</i>, <i>"pip"</i>, <i>"install"</i>, <i>"-q"</i>, <i>"uv"</i>], check=True)
+subprocess.run([<i>"uv"</i>, <i>"sync"</i>, <i>"--extra"</i>, <i>"gpu"</i>, <i>"--frozen"</i>], cwd=ROOT, check=True)</pre>
+
+  <pre class="tree">!cd /content/telegram-archive &amp;&amp; timeout -s INT 8h uv run archive transcribe --batch-size 25</pre>
+
+  <p>اختر <code>Runtime → Change runtime type → L4</code>. المدّة في <code>timeout</code> تساوي المدّة التي ستبقى فيها متّصلًا فعلًا، لا سقف المنصّة النظري.</p>
+
+  <div class="note warn"><b>مسألة نوع الأرقام.</b> بطاقة L4 تدعم bf16 فيحسم النموذج <code>auto</code> إليه، بينما فُرّغ النصف المنجَز على الماك بـ fp16 — ومثله سيكون على T4 في كاجل. النوع ليس جزءًا من <code>configHash</code>، فالهويّة سليمة والملفّات صالحة، لكنّ النصفين لن يكونا متجانسين رقميًّا تمامًا. إن أزعجك هذا على كولاب فالحلّ سطر واحد يمرّر <code>dtype="fp16"</code> عند بناء المفرّغ.</div>
+</section>
+
+<section id="practice">
+  <h2><span class="num">٠٩</span> أفضل الممارسات لحالتك</h2>
+  <div class="rules">
+    <div class="rule"><span class="rn"></span><div><b>‏<code>--batch-size 25</code>، لا ٥٠٠</b>عشر دقائق هي أسوأ ما تخسره عند القتل، بدل ثلاث ساعات وربع.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>‏<code>timeout -s INT</code> دائمًا</b>خروج نظيف يفكّ القفل ويكتب سجلّ الجولة، بدل قتلٍ يترك القفل ينتظر تقادمه خمس دقائق.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>ذاكرة النموذج إلى قرص مؤقّت</b>‏<code>HF_HOME</code> خارج مجلّد المخرجات، وإلّا حُفظت عدّة غيغابايت من أوزان النموذج مع كلّ نسخة من الدفتر.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>لا تترك البيئة متّصلة بلا عمل</b>الحصّة تُحسب بالوقت لا بالحوسبة. انتهى الأمر؟ أوقف الجلسة.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>منصّة واحدة في اللحظة الواحدة</b>القفل سيرفض الثانية — وهو أمان لا عطل — لكنّها تكون قد أكلت من حصّتك مقابل لا شيء.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>المفاتيح في Secrets لا في الخليّة</b>الدفتر خاصّ افتراضيًّا، لكن مفتاحًا مكتوبًا في خليّة يسافر مع أوّل مشاركة أو نسخة عامّة. وضعُها في Secrets يكلّفك دقيقة واحدة أوّل مرّة.</div></div>
+    <div class="rule"><span class="rn"></span><div><b>اقرأ سطر التغطية في أوّل كلّ جولة</b>هو مقياس التقدّم الوحيد الذي يعنيك، ومصدره Convex لا ذاكرة الجلسة.</div></div>
+  </div>
+</section>
+
+<section id="done">
+  <h2><span class="num">١٠</span> عندما تنتهي</h2>
+  <ul class="plain">
+    <li>معيار الخروج: <b>≥٩٩٪</b> من الثنائيات الصوتية الفريدة في حالة <code>done</code> تحت <code>configHash</code> الفعّال — أي ‏٩,٦٩٥ ملفًا فأكثر.</li>
+    <li>ثمّ <code>archive reconcile-artifacts</code> مرّة من جهازك: يجعل Convex وR2 يتّفقان، ويبلّغ عن أيّ ملف منجَز بلا أثر أو أثر بلا صفّ.</li>
+    <li>الإخفاقات التي تجاوزت خمس محاولات لن يلتقطها أيّ تشغيل تلقائي — تُقرأ من صفحة العمليّات وتُعالَج يدويًّا. ما دام عددها أقلّ من ٩٨ ملفًا فالمعيار متحقّق رغمها.</li>
+    <li>ثمّ يُغلق البند الأخير في <code>docs/tasks.md</code>، وتبدأ M3.</li>
+  </ul>
+</section>
+
+<section id="trouble">
+  <h2><span class="num">١١</span> الأعطال المتوقّعة</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>العرَض</th><th>السبب</th><th>التصرّف</th></tr></thead>
+    <tbody>
+      <tr><td><code>not started: stage held by run…</code></td><td>الماك ما زال يعمل، أو جلسة قُتلت قبل دقائق</td><td>انتظر خمس دقائق ثمّ أعد التشغيل</td></tr>
+      <tr><td>خطأ من <code>torchcodec</code> عند فكّ الترميز</td><td>مكتبات FFmpeg ناقصة في الصورة</td><td><code>!apt-get -qq install -y ffmpeg</code> في الخليّة الأولى</td></tr>
+      <tr><td><code>CUDA out of memory</code></td><td>ملف طويل جدًّا في دفعة كبيرة</td><td>‏<code>--batch-size</code> أصغر؛ الملفات المخفقة تُعاد أوّلًا في الجولة التالية</td></tr>
+      <tr><td>سرعة قريبة من سرعة الماك</td><td>الدفتر يعمل على المعالج لا البطاقة</td><td>تحقّق: <code>torch.cuda.get_device_name(0)</code></td></tr>
+      <tr><td>نفدت الوحدات في كولاب عند ٨٠٪</td><td>تقدير السرعة كان متفائلًا</td><td>أكمل على كاجل — لا شيء يضيع، الحالة كلّها في Convex وR2</td></tr>
+      <tr><td>‏٥٠٠ صفّ <code>processing</code> لا تتحرّك</td><td>أعمارها أقلّ من خمس دقائق</td><td>انتظر؛ تُلتقط تلقائيًّا</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</main>
+</div>
+
+<footer>
+  <span>أرشيف تيليجرام المعرفي · تقرير قرار المرحلة M2</span>
+  <span>الأرقام مقروءة من Convex في 2026-09-09 · configHash d27d1fb0a633</span>
+</footer>
+
+</div>
+</html>
