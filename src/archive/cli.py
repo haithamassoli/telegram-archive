@@ -209,6 +209,18 @@ def cmd_reconcile(args) -> int:
     return 1 if result["missing"] or result["invalid"] else 0
 
 
+def cmd_slim(args) -> int:
+    """Rewrite every published transcript artifact without its derived halves."""
+    from .pipeline import StageBusy
+
+    try:
+        transcribe.slim_published(dry_run=args.dry_run)
+    except StageBusy as exc:
+        print(f"not started: {exc}")
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="archive")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -299,6 +311,14 @@ def main(argv: list[str] | None = None) -> int:
         "--dry-run", action="store_true", help="report the drift, write nothing"
     )
     fix.set_defaults(func=cmd_reconcile)
+
+    thin = sub.add_parser(
+        "slim-transcripts", help="rewrite published transcripts without derived fields"
+    )
+    thin.add_argument(
+        "--dry-run", action="store_true", help="report the saving, write nothing"
+    )
+    thin.set_defaults(func=cmd_slim)
 
     args = parser.parse_args(argv)
     return args.func(args)

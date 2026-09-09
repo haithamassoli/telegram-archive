@@ -17,13 +17,14 @@ provenance against the pin and a mismatch is a failure, never a new identity.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import time
 from pathlib import Path
 
 from . import convex, r2
-from .config import CONFIG_HASH, PINNED_CONFIG, REPO_ROOT
+from .config import CONFIG_HASH, PINNED_CONFIG, REPO_ROOT, canonical_json
 
 STAGE = "transcribe"
 BATCH = 500  # files per transcriber call, per plan Phase 2
@@ -31,6 +32,7 @@ SCAN_PAGE = 500
 FAILURE_ATTEMPT_CAP = 5  # §4.6 — past this a sha256 waits for a human
 STALE_PROCESSING_MS = 5 * 60 * 1000  # §4.3, same window as the stage lock
 PREFIX = "transcripts/"
+IMPL_PREFIX = "meta/implementation/"
 TMP_DIR = REPO_ROOT / ".tmp" / "asr"
 OUT_DIR = TMP_DIR / "out"
 
@@ -73,6 +75,54 @@ def is_audio(row: dict) -> bool:
     """
     mime = (row.get("mimeType") or "").lower()
     return mime.startswith("audio/") or (row.get("ext") or "").lower() in AUDIO_EXTS
+
+
+# Everything below is arithmetic over what stays, or a literal copy of it, so it
+# is dropped before upload rather than stored 9,793 times (docs/report-transcripts.html):
+#   words   the segment span divided by its token count — under the pinned
+#           `alignment: "segment"` there is no aligner (`models.aligner` is null)
+#           and every word says so itself: `timing_source: "uniform_speech_spans"`
+#   cues    those same words grouped into SRT/VTT lines by `build_cues`
+#   transcript          `[s["text"] for s in segments]`, verbatim
+#   implementation      the same 60 package hashes in every file
+#   generated_tokens_by_segment   per-segment counters; `token_limit_segments`
+#           already names the only case that matters
+DERIVED = (
+    "implementation",
+    "transcript",
+    "words",
+    "cues",
+    "generated_tokens_by_segment",
+)
+# `source.path` is a `.tmp/` file deleted before the upload; `speech_spans` is the
+# VAD silence map, dropped by decision — nothing in the plan reads it, and Silero
+# reproduces it from the blob on CPU if it is ever wanted back.
+DERIVED_FIELDS = {
+    "source": ("path",),
+    "segmentation_details": ("speech_spans",),
+}
+
+
+def slim(data: dict) -> dict:
+    """The artifact minus everything that can be rebuilt from it. Idempotent.
+
+    Every field `validate_artifact` reads survives, so this is invisible to the
+    §4.3 recovery path and to transcript identity — `configHash` covers the six
+    pinned values, never the file's shape.
+    """
+    out = {key: value for key, value in data.items() if key not in DERIVED}
+    for field, dropped in DERIVED_FIELDS.items():
+        block = out.get(field)
+        if isinstance(block, dict):
+            out[field] = {k: v for k, v in block.items() if k not in dropped}
+    return out
+
+
+def artifact_bytes(data: dict) -> bytes:
+    """What is uploaded: slim, no indent, Arabic left unescaped."""
+    return json.dumps(slim(data), ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
 
 
 def validate_artifact(data: dict) -> dict:
@@ -251,8 +301,11 @@ def process_batch(
             if result.status == "failed":
                 raise RuntimeError(result.error or "transcription failed")
             artifact = OUT_DIR / f"{sha256}.json"
-            body = artifact.read_bytes()
-            facts = validate_artifact(json.loads(body))
+            # Validate everything the model published, upload only what cannot
+            # be derived from itself.
+            data = json.loads(artifact.read_bytes())
+            facts = validate_artifact(data)
+            body = artifact_bytes(data)
             key = transcript_key(sha256, config_hash)
             s3.put_object(
                 Bucket=bucket,
@@ -507,5 +560,124 @@ def _reconcile(config_hash: str, dry_run: bool, log, counts) -> dict:
         "invalid": invalid,
         "superseded": superseded,
         "orphans": orphans,
+        "dryRun": dry_run,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# slim-transcripts — rewrite what was published before `slim` existed
+# --------------------------------------------------------------------------- #
+
+
+def slim_published(
+    config_hash: str = CONFIG_HASH, dry_run: bool = False, log=_log
+) -> dict:
+    """Rewrite every published artifact in its slim form. Idempotent, resumable.
+
+    Under the same stage lock as `transcribe`, because it rewrites the objects a
+    running worker is still uploading. `put_object` on the same key is an atomic
+    replace — a reader sees the old bytes or the new ones, never a torn object —
+    and nothing is ever deleted, so §4.4-C still holds.
+    """
+    from . import pipeline
+
+    with pipeline.stage(STAGE) as counts:
+        return _slim_published(config_hash, dry_run, log, counts)
+
+
+def _slim_published(config_hash: str, dry_run: bool, log, counts) -> dict:
+    s3, bucket = r2.client(), r2.bucket()
+    before = after = 0
+    rewritten = already = 0
+    invalid: list[tuple[str, str]] = []
+    implementations: dict[str, dict] = {}
+
+    for key in sorted(r2.list_keys(s3, bucket, PREFIX)):
+        # Another config's artifacts are not this command's business; they are
+        # `reconcile-artifacts`' report line. Nor is a key we did not write.
+        if not key.endswith(f"/{config_hash}.json") or key_sha256(key) is None:
+            continue
+        body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+        data = json.loads(body)
+        try:
+            validate_artifact(data)
+        except Exception as exc:
+            # Already broken before this command touched it — `reconcile` owns
+            # that verdict. Rewriting it would only make the damage smaller.
+            invalid.append((key, str(exc)[:200]))
+            continue
+        new = artifact_bytes(data)
+        before += len(body)
+        after += len(new)
+        block = data.get("implementation")
+        if isinstance(block, dict):
+            implementations.setdefault(
+                hashlib.sha256(canonical_json(block).encode("utf-8")).hexdigest(), block
+            )
+        if new == body:
+            already += 1
+            counts.skipped += 1
+            continue
+        # The input validated a moment ago, so a slim that fails here is a bug
+        # in `slim` — stop the whole run rather than publish 9,793 of them.
+        validate_artifact(json.loads(new))
+        if not dry_run:
+            s3.put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=new,
+                ContentType="application/json",
+                Metadata={"sha256": key_sha256(key), "configHash": config_hash},
+            )
+        rewritten += 1
+        counts.processed += 1
+
+    # The 60 package hashes were identical in every artifact; keep one copy of
+    # each distinct block rather than destroying the provenance outright.
+    impl_keys = []
+    for digest, block in sorted(implementations.items()):
+        impl_key = f"{IMPL_PREFIX}{digest[:12]}.json"
+        impl_keys.append(impl_key)
+        if not dry_run:
+            s3.put_object(
+                Bucket=bucket,
+                Key=impl_key,
+                Body=canonical_json(block).encode("utf-8"),
+                ContentType="application/json",
+            )
+    if len(implementations) > 1:
+        log(
+            f"  !! {len(implementations)} distinct implementation blocks — the "
+            "package changed mid-campaign"
+        )
+
+    saved = before - after
+    log(
+        f"{rewritten + already} artifact(s) for configHash {config_hash[:12]}: "
+        f"{rewritten} rewritten, {already} already slim"
+    )
+    log(
+        f"  {before / 1e6:.1f} MB -> {after / 1e6:.1f} MB ({saved / before:.1%} saved)"
+        if before
+        else "  nothing published yet"
+    )
+    for impl_key in impl_keys:
+        log(f"  implementation kept at {impl_key}")
+    for key, why in invalid:
+        log(f"  !! {key} rejected before slimming, left alone — {why}")
+    if dry_run:
+        log("  (dry run — nothing written)")
+    counts.success = rewritten
+    counts.failure = len(invalid)
+    counts.notes.append(
+        f"rewritten={rewritten} already={already} bytes={before}->{after}"
+    )
+    return {
+        "rewritten": rewritten,
+        "alreadySlim": already,
+        "invalid": invalid,
+        "bytesBefore": before,
+        "bytesAfter": after,
+        "implementations": impl_keys,
         "dryRun": dry_run,
     }

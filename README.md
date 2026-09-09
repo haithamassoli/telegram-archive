@@ -1,6 +1,6 @@
 # Telegram Knowledge Archive
 
-Implementation of `docs/telegram_archive_plan.md` (v2.2, FROZEN).
+Implementation of `docs/telegram_archive_plan.md` (v2.3, FROZEN).
 Milestones and their exit criteria live in `docs/tasks.md`.
 
 ## Layout
@@ -39,6 +39,7 @@ archive sync                                 # M1: archive the in-scope channels
 archive verify-archive                       # M1 exit criteria; exit 1 until met
 archive transcribe                           # M2: every audio binary -> a done part transcript
 archive reconcile-artifacts                  # §4.4: make Convex and R2 agree
+archive slim-transcripts                     # drop the derived half of every transcript
 ```
 
 ## M1 — the archive (`archive sync`)
@@ -78,7 +79,19 @@ archive transcribe --limit 20         # bounded run
 archive transcribe --batch-size 100   # smaller batches = less scratch disk
 archive transcribe --sha256 <sha>     # one binary
 archive reconcile-artifacts --dry-run # what Convex and R2 disagree about
+archive slim-transcripts --dry-run    # what the derived fields still cost
 ```
+
+An artifact is uploaded without the parts of itself it can rebuild: `words`
+(the segment span divided by its token count — under the pinned
+`alignment: "segment"` there is no aligner at all), `cues` (those words grouped
+into SRT/VTT lines), `transcript` (`segments` texts verbatim), `implementation`
+(the same 60 package hashes in every file), and the VAD `speech_spans`. What is
+left is `segments` plus the provenance `validate_artifact` checks, which is why
+the drop is invisible to it and to `configHash` — **515 KB becomes 22 KB.**
+`slim-transcripts` rewrites what was published before this existed; it is
+idempotent, takes the same stage lock as `transcribe`, replaces each key
+atomically and deletes nothing.
 
 A transcript is written to `transcripts/{sha256}/{configHash}.json` **before**
 its Convex row flips to `done` (§4.1), so a `done` row always has its artifact

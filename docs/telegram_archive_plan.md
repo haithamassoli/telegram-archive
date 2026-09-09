@@ -1,6 +1,6 @@
-# Telegram Knowledge Archive — Implementation Plan v2.2 (FROZEN)
+# Telegram Knowledge Archive — Implementation Plan v2.3 (FROZEN)
 
-**Status: FROZEN implementation baseline.** Supersedes v2 / v2.1 / both review docs; standalone. The next architecture change requires a concrete implementation blocker discovered in real data — not another review round.
+**Status: FROZEN implementation baseline.** Supersedes v2 / v2.1 / both review docs; standalone. The next architecture change requires a concrete implementation blocker discovered in real data — not another review round. v2.3 (2026-09-05) fills declared-but-thin sections and closes gaps found while operating M1/M2 — no architecture change; log in §11.
 **Stack:** Python + Telethon · Convex · Cloudflare R2 · cohere-transcribe · Meilisearch · FFmpeg/ffprobe.
 
 ---
@@ -30,6 +30,8 @@ lesson identity               = lessonKey        (deterministic from source;
 lesson composition identity   = assemblyHash     (ordered part sha256s)
 lesson transcript identity    = assemblyHash + configHash
 merged audio identity         = mergedSha256     (of the produced file)
+search chunk identity         = lessonId + assemblyHash + seq
+embedding identity            = embedHash        (pinned embed config; Phase 4.5)
 ```
 
 Staleness is checked by identity, not flags: a lesson-transcript artifact is current iff its key embeds the lesson's **current** `assemblyHash` and the **active** `configHash`. Same pattern for chunks and merged audio.
@@ -132,6 +134,9 @@ telegram-archive/                         (private, permanent)
   lesson-transcripts/{lessonId}/{assemblyHash}-{configHash}.json
                                           (organizerVersion recorded inside)
   legacy/assoli-v1/                       (one-time export, §8)
+  backups/convex/{yyyy-mm-dd}.zip         (weekly `npx convex export` — §6 Phase 6;
+                                           the only non-reproducible data is human
+                                           decisions living in Convex)
 
 lessons-media/                            (public via custom domain)
   lessons/{lessonId}/{mergedSha256}.{m4a|opus}    (codec per Phase-0 gate)
@@ -150,7 +155,7 @@ lessons-media/                            (public via custom domain)
 7. **Override precedence:** per §0 amendment 1 — reruns never touch `approved` compositions; source-message changes demote to `needs_review`.
 8. **Full re-runs stay legal** for Organizer (subject to rule 7), Lesson Transcript Builder, Chunk Builder, reindex.
 
-**Reprocessing map:** grouping change → new `assemblyHash` → regen lesson transcript + chunks + merge; transcription config change → new `configHash` → new part transcripts → downstream; normalization/chunk/index change → rebuild search documents only; nothing downstream ever requires re-downloading Telegram.
+**Reprocessing map:** grouping change → new `assemblyHash` → regen lesson transcript + chunks + merge; transcription config change → new `configHash` → new part transcripts → downstream; normalization/chunk/index change (`normVersion`) → rebuild search documents only; embed config change → new `embedHash` → re-embed + vector update only; nothing downstream ever requires re-downloading Telegram.
 
 ---
 
@@ -199,8 +204,28 @@ lessons-media/                            (public via custom domain)
 ### Phase 4 — Search v0 (beta alongside live v1)
 - Chunks from lesson-transcript artifacts (part-level fallback for ungrouped audio); deterministic IDs.
 - Meilisearch `articles` + `audio_chunks`: searchable `normalizedTitle`, `normalizedText`; displayed `title`, `text`; filters `channel`, `seriesName`, `lessonId`; sort `date`. Full `reindex` proven; `indexedAt`/`indexVersion` stamped.
+- **Deployment:** self-hosted, version pinned in `.env`; on the dev machine for the beta, moves to the VPS at cutover (Phase 6 placement). Master key server-side only; search-only key in the client (Phase 7). The index is derived data: recovery = reindex from Convex + R2 (drilled in Phase 7), so no Meilisearch snapshots.
+- **Normalization contract (`normVersion`):** one versioned function used for index-side `normalized*` fields, query preprocessing, and the §8.4 log replay — never two implementations. v1: strip tashkeel + tatweel; أ/إ/آ/ٱ → ا; ة → ه; ى → ي; Arabic-Indic digits → Latin; collapse whitespace. Raw `title`/`text` always stored for display. Bumping it rebuilds search documents only (§4 map). Meilisearch's own Arabic folding (charabia) may overlap; ours is authoritative so replay results never depend on Meilisearch internals.
+- **Documents:**
+  ```text
+  audio_chunks   id = {lessonId}:{assemblyHash[:8]}:{seq:04d}
+    lessonId, channel, seriesName?, seriesEpisode?, date, startMs, endMs
+    title, normalizedTitle, text, normalizedText, telegramUrl
+  articles       id = {channelId}:{telegramMessageId}
+    channel, date, title, normalizedTitle, text, normalizedText, telegramUrl
+  ```
+  Lesson recomposition = delete by `lessonId` filter, re-add; ids embed `assemblyHash` so stale chunks cannot collide with fresh ones.
+- **Initial settings (tuned in Phase 7, never invented there):** synonyms seeded from `legacy/assoli-v1/domain-synonyms.json`; ranking = Meilisearch default order with attribute weight title > text; `distinctAttribute = lessonId` on `audio_chunks` (one hit per lesson in mixed results; in-lesson occurrences via a `lessonId`-filtered follow-up query); typo tolerance on, `minWordSizeForTypos` tuned for short Arabic tokens.
 - UI: RTL, tabs, excerpts, series facets, Telegram links; raw-part playback via short-lived signed R2 URLs (Range OK; refresh on 403). Raw bucket private forever.
 - **Exit:** replay v1 query logs against v1 and v2 as the relevance test set.
+
+### Phase 4.5 — Hybrid semantic search (bge-m3; gated, optional)
+**Gate:** build keyword v0 first and run the §8.4 replay. Enter this phase only if the replay shows recall failures that normalization + synonyms do not close (paraphrase queries returning nothing relevant). Keep it only if hybrid beats keyword on the same replay. No baseline → no measurable gain → no vectors.
+- **Why bge-m3:** Arabic derivational morphology and paraphrase-heavy فقهي/عقدي phrasing break exact-token recall (query «حكم الاحتفال بالمولد» vs a lesson that says «بدعية إقامة الموالد»). Dense embeddings retrieve by meaning. bge-m3 is multilingual with strong Arabic, 8k context, 1024-d dense output, and runs locally — no per-query API cost, no text leaving the machines.
+- **Identity:** `embedHash` = canonical JSON of {model `BAAI/bge-m3`, resolved revision commit, dim 1024, normalize true} — same law as `configHash`: resolved once, pinned, drift = failure; change = re-embed everything (§1, §4 map). Dense vectors only; sparse/ColBERT outputs are skipped — the keyword side already owns lexical matching.
+- **Index side:** the nightly job on the GPU host embeds new/changed chunks (from `normalizedText`) and ships vectors on the same documents as `_vectors.default` with a `userProvided` embedder (dimensions 1024).
+- **Query side:** a small embed service (ONNX int8, CPU) beside Meilisearch on the VPS embeds the query; client calls hybrid search with `semanticRatio` starting at 0.3–0.5, tuned by replay in Phase 7.
+- **Sizing:** ~150–200k chunk docs → ~0.6–0.8 GB raw vectors + ANN overhead; the VPS needs ~4 GB RAM, or enable Meilisearch binary quantization.
 
 ### Phase 5 — Merged playback
 - concat-demuxer fast path / re-encode fallback to gated codec; merged sha256 → public bucket; Σ durations ≈ merged (warn > 500 ms); `mergeStatus` lifecycle.
@@ -208,14 +233,22 @@ lessons-media/                            (public via custom domain)
 
 ### Phase 6 — Review & continuous sync
 - Review UI: needs_review queue by confidence; preview/reorder/add/remove/split/merge/rename; approve → new `assemblyHash` → regen transcript + remerge + reindex (lesson-scoped).
-- Incremental sync on a normal session: > `lastMessageId` + ~300-message recheck (edits/`deletedAt`); affected approved lessons demote to `needs_review` (§4.7), never recompose.
-- systemd timers under §4.5 locks: sync 15 min → transcribe-pending → index-pending; merge nightly.
+- Incremental sync on a normal session (no takeout — that privilege is for the historical bulk pull only): > `lastMessageId` + ~300-message recheck (edits/`deletedAt`); affected approved lessons demote to `needs_review` (§4.7), never recompose.
+- **Timers under §4.5 locks — the whole automation story.** No bot, no daemon, no framework: each cadence is one dumb wrapper script chaining the existing idempotent commands, fired by the OS scheduler. Every command self-locks and skips `done` work, so blind scheduling is the design, not a compromise.
+  ```text
+  every 15 min   sync → transcribe-pending → organize → index-pending
+  nightly        merge (+ Phase-4.5 embed batch, if adopted)
+  weekly         reconcile-artifacts · `npx convex export` → backups/convex/
+  ```
+- **Placement (closes Open Item 1):** the GPU host is the M-series Mac. Until cutover, all timers run there as launchd LaunchAgents (macOS has no systemd). At cutover they move as systemd timers to the VPS that hosts Meilisearch and the site anyway. Transcription then either stays on the Mac or runs on the VPS CPU — transcript identity is the pinned config, not the device, so both are legal; and the §4.5 stage locks already arbitrate two machines, so splitting stages across VPS + Mac needs no new code. The session file moves to the VPS as a secret with the same care as `.env`.
+- **Failure push:** at the end of each wrapper run, any non-ok `pipelineRuns` row or new unresolved `failures` row → one Telegram message via a plain bot token (`sendMessage`, ~10 lines). The bot sends only; it never reads channels — the push complement to the Phase-7 ops page.
+- **Human-decision backup:** the weekly Convex export above exists because §7's "everything downstream is reproducible" is true of pipeline output only — approvals and manual corrections live in Convex and no GPU can regenerate them. Restore is drilled in Phase 7.
 
 ### Phase 7 — Hardening & relevance
 - Ops page: stage counts, `failures`, `pipelineLocks` state, `pipelineRuns` history (last run, duration, counts), per-channel sync.
 - `reconcile-artifacts` scheduled weekly; retry wrappers; temp cleanup; signed-URL endpoint rate-limited; least-privilege keys; search-only Meili key client-side.
-- Relevance from real v1 query logs: hamza/diacritics variants, Arabic typo tolerance, chunk duration, title weight; then decide if raw `text` joins searchable.
-- Recovery drills incl. the §4.3 crash window; reindex-from-scratch proven.
+- Relevance from real v1 query logs: hamza/diacritics variants (via `normVersion`), Arabic typo tolerance, chunk duration, title weight, `distinctAttribute` revisit, hybrid `semanticRatio` (if Phase 4.5 was adopted); then decide if raw `text` joins searchable.
+- Recovery drills incl. the §4.3 crash window; reindex-from-scratch proven; Convex snapshot restore walked through once.
 
 ---
 
@@ -254,6 +287,19 @@ The remaining uncertainty — title-format drift across eras, grouping accuracy,
 
 ## 10. Open Items (do not block Phase 0/1)
 
-1. GPU location (desktop vs server) — shapes Phase-6 timers only.
+1. GPU location — **decided (v2.3): the M-series Mac is the GPU host; timer placement per Phase 6** (launchd on the Mac now, systemd on the VPS at cutover, stages splittable across both under the §4.5 locks).
 2. Phase-1 download scope — **decided: `@alkulife` (14,787 msgs) and `@doros_alkulify` (11,899) only.** `@T_alkulife` (904), `@alkulifyfgh` (16) and `@KulifyAntiCapitalism` (9) are out of scope for now.
 3. assoli-v1 salvage — any manually corrected transcripts? Anything else in the v1 data model (accounts, bookmarks, analytics) worth exporting?
+4. Video scope (surfaced by the M2 full scan): 94 video containers carry 6.2 h of audio, excluded from Phase 2 by its "unique audio sha256s" wording. **Decide before Phase 3** whether their audio joins the transcript corpus; recommendation is yes — ~40 min of GPU at the measured campaign rate, and they become searchable lessons.
+
+---
+
+## 11. v2.3 Amendment Log (2026-09-05)
+
+Spec completion, not architecture change — every item below either details a section the plan already declared or closes a gap found while operating M1/M2 for real. The freeze holds.
+
+1. **Phase 6 automation spelled out:** wrapper-script-per-cadence over the existing self-locking commands; launchd-on-Mac now / systemd-on-VPS at cutover; two-machine stage split legalized by the existing locks; CPU transcription legalized by identity-is-config; failure push via a send-only bot token. Closes Open Item 1.
+2. **Human-decision backup (gap):** weekly `npx convex export` → `backups/convex/` in the private bucket, restore drilled in Phase 7. §7's reproducibility claim covers pipeline output, not approvals/corrections; this was the one unbacked-up data class.
+3. **Phase 4 search spec filled in:** deployment + key handling, the `normVersion` normalization contract (one function for index, query, and replay), concrete document shapes with `assemblyHash`-embedding chunk ids, and initial index settings including synonyms seeded from the v1 `domain-synonyms.json`.
+4. **Phase 4.5 added — hybrid semantic search with bge-m3, explicitly gated** on the §8.4 keyword-replay showing recall gaps that normalization + synonyms cannot close. Embeddings get the same identity discipline as transcripts (`embedHash`), added to §1 and the §4 reprocessing map.
+5. **Open Item 4 added:** the 94-video / 6.2 h scope decision the M2 scan surfaced, due before Phase 3.

@@ -208,6 +208,38 @@ def artifact(duration=60.0, segments=3, **overrides) -> dict:
     return data
 
 
+def fat_artifact(**overrides) -> dict:
+    """`artifact()` plus every block cohere-transcribe publishes and `slim` drops."""
+    data = artifact(**overrides)
+    data["source"]["path"] = "/Users/x/.tmp/asr/deadbeef.mp3"
+    data["segmentation_details"]["speech_spans"] = [
+        {"start": i, "end": i + 0.5} for i in range(3)
+    ]
+    data["implementation"] = {
+        "package_version": "0.1.4",
+        "artifacts_sha256": {
+            f"cohere_transcribe/m{i}.py": f"{i:064d}" for i in range(60)
+        },
+    }
+    data["transcript"] = [s["text"] for s in data["segments"]]
+    data["words"] = [
+        {
+            "start": i,
+            "end": i + 0.3,
+            "text": "نص",
+            "segment_index": i,
+            "segment_word_index": 0,
+            "timing_source": "uniform_speech_spans",
+        }
+        for i in range(3)
+    ]
+    data["cues"] = [{"start": i, "end": i + 0.3, "text": "نص"} for i in range(3)]
+    data["generated_tokens_by_segment"] = [
+        {"segment_index": i, "tokens": 10} for i in range(3)
+    ]
+    return data
+
+
 @dataclass
 class FakeResult:
     path: str
@@ -308,7 +340,15 @@ class World:
             pipeline.convex = pipeline_convex
 
     def reconcile(self, **kwargs):
-        saved = (transcribe.convex, transcribe.r2)
+        return self._locked(transcribe.reconcile, **kwargs)
+
+    def slim(self, **kwargs):
+        return self._locked(transcribe.slim_published, **kwargs)
+
+    def _locked(self, command, **kwargs):
+        """Run a stage command against the fakes — `pipeline` included, or its
+        stage lock would be taken on the real deployment."""
+        saved = (transcribe.convex, transcribe.r2, pipeline.convex)
         transcribe.convex = self.convex
         transcribe.r2 = types.SimpleNamespace(
             client=lambda: self.s3,
@@ -317,11 +357,12 @@ class World:
                 k for k in self.s3.objects if k.startswith(prefix)
             },
         )
+        pipeline.convex = self.convex
         try:
             kwargs.setdefault("log", lambda *a: None)
-            return transcribe.reconcile(**kwargs)
+            return command(**kwargs)
         finally:
-            transcribe.convex, transcribe.r2 = saved
+            transcribe.convex, transcribe.r2, pipeline.convex = saved
 
 
 SHA = {name: name[0] * 64 for name in ("a", "b", "c", "d")}
@@ -651,6 +692,128 @@ def test_fake_convex_matches_the_deployed_signatures():
     table = re.search(r"partTranscripts: defineTable\(\{(.*?)\n  \}\)", schema, re.S)
     fields = set(re.findall(r"(\w+): v\.", table.group(1)))
     assert {"rawR2Key", "durationMs", "segmentCount", "model", "modelRevision"} <= fields
+
+
+# --------------------------------------------------------------------------- #
+# slim: what never reaches R2, and the backfill for what already did
+# --------------------------------------------------------------------------- #
+
+
+def test_slim_drops_every_derived_field_and_keeps_the_rest():
+    full = fat_artifact()
+    thin = transcribe.slim(full)
+
+    for dropped in transcribe.DERIVED:
+        assert dropped in full, dropped  # the fixture must actually carry it
+        assert dropped not in thin, dropped
+    assert "path" not in thin["source"]
+    assert "speech_spans" not in thin["segmentation_details"]
+
+    # The core and every pinned field survive untouched.
+    assert thin["segments"] == full["segments"]
+    assert thin["source"]["duration_seconds"] == full["source"]["duration_seconds"]
+    assert thin["segmentation_details"]["merge"] == PINNED_CONFIG["vadMerge"]
+    assert thin["models"] == full["models"]
+    assert (thin["language"], thin["segmentation"], thin["timing"]) == (
+        PINNED_CONFIG["language"],
+        PINNED_CONFIG["vad"],
+        PINNED_CONFIG["alignment"],
+    )
+    assert full.get("words"), "slim must not mutate its input"
+
+
+def test_slim_is_idempotent_so_the_backfill_can_be_rerun():
+    thin = transcribe.slim(fat_artifact())
+    assert transcribe.slim(thin) == thin
+    assert transcribe.artifact_bytes(thin) == transcribe.artifact_bytes(fat_artifact())
+
+
+def test_slim_is_invisible_to_validate_artifact():
+    """The §4.3 recovery path reads the slim artifact exactly as it read the fat one."""
+    full = fat_artifact()
+    assert transcribe.validate_artifact(transcribe.slim(full)) == (
+        transcribe.validate_artifact(full)
+    )
+
+
+def test_artifact_bytes_are_compact_and_leave_arabic_alone():
+    body = transcribe.artifact_bytes(fat_artifact())
+    assert b"\n" not in body and b", " not in body  # no indent, no pretty separators
+    assert "نص".encode() in body  # not \u0646\u0635
+    assert json.loads(body)["segments"]
+
+
+def test_a_run_uploads_the_slim_artifact_not_what_the_model_published():
+    world = World()
+    world.blob(SHA["a"])
+    world.transcriber = FakeTranscriber(body=lambda sha: fat_artifact())
+
+    result = world.run()
+    assert result["transcribed"] == 1
+
+    stored = json.loads(world.s3.objects[transcribe.transcript_key(SHA["a"])])
+    assert not set(stored) & set(transcribe.DERIVED)
+    assert stored["segments"] == fat_artifact()["segments"]
+    # Convex still learned the facts, which are read before the drop.
+    row = world.convex.transcripts[(SHA["a"], CONFIG_HASH)]
+    assert row["status"] == "done" and row["segmentCount"] == 3
+
+
+def test_slim_published_rewrites_fat_artifacts_and_leaves_slim_ones_alone():
+    world = World()
+    world.blob(SHA["a"])
+    world.blob(SHA["b"])
+    world.publish(SHA["a"], fat_artifact())
+    world.s3.objects[transcribe.transcript_key(SHA["b"])] = transcribe.artifact_bytes(
+        fat_artifact()
+    )
+    other_config = f"transcripts/{SHA['a']}/older-config.json"
+    world.s3.objects[other_config] = json.dumps(fat_artifact()).encode()
+
+    dry = world.slim(dry_run=True)
+    assert dry["rewritten"] == 1 and dry["alreadySlim"] == 1
+    assert dry["bytesAfter"] < dry["bytesBefore"]
+    assert json.loads(world.s3.objects[transcribe.transcript_key(SHA["a"])])["words"]
+
+    done = world.slim()
+    assert done["rewritten"] == 1 and done["alreadySlim"] == 1
+    stored = json.loads(world.s3.objects[transcribe.transcript_key(SHA["a"])])
+    assert not set(stored) & set(transcribe.DERIVED)
+    assert transcribe.validate_artifact(stored)["segmentCount"] == 3
+    # Another config's artifact is not this command's business.
+    assert json.loads(world.s3.objects[other_config])["words"]
+    # And a second pass is a no-op.
+    assert world.slim()["rewritten"] == 0
+
+
+def test_slim_published_leaves_an_already_invalid_artifact_alone():
+    """A broken artifact is `reconcile`'s verdict; slimming it only shrinks the damage."""
+    world = World()
+    world.blob(SHA["a"])
+    world.blob(SHA["b"])
+    world.publish(SHA["a"], fat_artifact(language="en"))  # not what the pin says
+    world.publish(SHA["b"], fat_artifact())
+
+    result = world.slim()
+    assert [key for key, _ in result["invalid"]] == [transcribe.transcript_key(SHA["a"])]
+    assert result["rewritten"] == 1
+    assert json.loads(world.s3.objects[transcribe.transcript_key(SHA["a"])])["words"]
+    assert "words" not in json.loads(
+        world.s3.objects[transcribe.transcript_key(SHA["b"])]
+    )
+
+
+def test_slim_published_keeps_one_copy_of_the_implementation_block():
+    world = World()
+    world.blob(SHA["a"])
+    world.blob(SHA["b"])
+    world.publish(SHA["a"], fat_artifact())
+    world.publish(SHA["b"], fat_artifact())
+
+    result = world.slim()
+    assert len(result["implementations"]) == 1, "identical blocks must collapse to one"
+    kept = json.loads(world.s3.objects[result["implementations"][0]])
+    assert kept == fat_artifact()["implementation"]
 
 
 def main() -> int:

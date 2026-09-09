@@ -1,6 +1,6 @@
 # Telegram Knowledge Archive — Milestones & Tasks
 
-Derived from `docs/telegram_archive_plan.md` (v2.2, FROZEN). Milestone numbers mirror plan phases for traceability; § references point into the plan.
+Derived from `docs/telegram_archive_plan.md` (v2.3, FROZEN). Milestone numbers mirror plan phases for traceability; § references point into the plan.
 
 ## Sequencing
 
@@ -100,13 +100,25 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 **Goal:** searchable articles + audio chunks behind a usable RTL UI.
 **Exit:** v1 query-log replay against both v1 and v2 produces a recorded relevance comparison (the regression set for M7).
 
-- [ ] Chunk builder: 45–90 s chunks from lesson-transcript artifacts; deterministic IDs; part-N tails always joined with part-N+1 heads (§5); part-level fallback for ungrouped audio
-- [ ] Meilisearch `articles` + `audio_chunks`: searchable `normalizedTitle`/`normalizedText`; displayed `title`/`text`; filters `channel`, `seriesName`, `lessonId`; sort `date`
+- [ ] Chunk builder: 45–90 s chunks from lesson-transcript artifacts; deterministic IDs `{lessonId}:{assemblyHash[:8]}:{seq}`; part-N tails always joined with part-N+1 heads (§5); part-level fallback for ungrouped audio
+- [ ] Normalization contract `normVersion` v1 (plan Phase 4): one versioned function for index fields, query preprocessing, and the §8.4 replay — strip tashkeel/tatweel, unify alef/ta-marbuta/alef-maqsura, unify digits; raw text always kept for display
+- [ ] Meilisearch `articles` + `audio_chunks`: searchable `normalizedTitle`/`normalizedText`; displayed `title`/`text`; filters `channel`, `seriesName`, `lessonId`, `date`; sort `date`; document shapes per plan Phase 4
+- [ ] Initial index settings: synonyms seeded from `legacy/assoli-v1/domain-synonyms.json`; attribute weight title > text; `distinctAttribute = lessonId` on `audio_chunks`; typo tolerance on (tuning belongs to M7)
+- [ ] Meilisearch deployment: self-hosted, version pinned in `.env`, on the dev machine for the beta; master key server-side only. No snapshots — recovery is reindex-from-scratch (drilled in M7)
 - [ ] Full `reindex` from scratch proven; `indexedAt`/`indexVersion` stamped
 - [ ] Import v1 manual corrections as transcript overrides (§8.3) — the only data no GPU can reproduce
 - [ ] UI: RTL, articles/audio tabs, excerpts, series facets, Telegram links
 - [ ] Raw-part playback via short-lived signed R2 URLs (Range OK; refresh on 403); raw bucket stays private forever
 - [ ] Relevance baseline: replay v1 query logs against v1 and v2; record results (§8.4)
+
+## M4.5 — Hybrid semantic search (bge-m3 — gated, optional; plan Phase 4.5)
+
+**Gate:** enter only if the M4 keyword replay shows recall failures that `normVersion` + synonyms cannot close; keep only if hybrid beats keyword on the same replay.
+
+- [ ] Pin embed config → `embedHash` (model `BAAI/bge-m3`, resolved revision, dim 1024, normalize) — same drift-fails law as `configHash`
+- [ ] Nightly embed batch on the GPU host: new/changed chunks → dense vectors on the same documents (`userProvided` embedder, `_vectors.default`)
+- [ ] Query-side embed service (ONNX int8, CPU) beside Meilisearch; hybrid search with `semanticRatio` 0.3–0.5
+- [ ] A/B on the §8.4 replay: hybrid vs keyword; record go/no-go. Sizing: ~4 GB RAM on the VPS or binary quantization
 
 ---
 
@@ -134,8 +146,11 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 
 - [ ] Review UI: `needs_review` queue ordered by confidence; preview, reorder, add/remove parts, split, merge, rename
 - [ ] Approve flow: approve → new `assemblyHash` → lesson-scoped regen (lesson transcript + remerge + reindex)
-- [ ] Incremental sync on a normal session: messages > `lastMessageId` + ~300-message recheck for edits/`deletedAt`; affected `approved` lessons demote to `needs_review` (§4.7), never recompose
-- [ ] systemd timers under §4.5 locks: sync every 15 min → transcribe-pending → index-pending; merge nightly
+- [ ] Incremental sync on a normal session (no takeout): messages > `lastMessageId` + ~300-message recheck for edits/`deletedAt`; affected `approved` lessons demote to `needs_review` (§4.7), never recompose
+- [ ] Timers under §4.5 locks — one dumb wrapper script per cadence chaining the existing self-locking commands: every 15 min sync → transcribe-pending → organize → index-pending; merge nightly (+ M4.5 embed batch if adopted); weekly reconcile + Convex export
+- [ ] Placement per plan Phase 6: launchd LaunchAgents on the Mac (the GPU host) now; move to systemd on the VPS at cutover. Stage split across VPS + Mac is legal under the existing locks; CPU transcription on the VPS is legal because transcript identity is the pinned config, not the device
+- [ ] Failure push: end of each wrapper run, non-ok `pipelineRuns` or new unresolved `failures` → one Telegram message via a send-only bot token (~10 lines; the bot never reads channels)
+- [ ] Human-decision backup: weekly `npx convex export` → `backups/convex/{date}.zip` in the private bucket — approvals/corrections are the one thing no GPU can regenerate
 
 ---
 
@@ -148,5 +163,5 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 - [ ] Schedule `reconcile-artifacts` weekly
 - [ ] Retry wrappers on network/API calls; temp cleanup
 - [ ] Security: rate-limit the signed-URL endpoint; least-privilege key audit; search-only Meilisearch key client-side
-- [ ] Relevance tuning from v1 logs: hamza/diacritics variants, Arabic typo tolerance, chunk duration, title weight; then decide whether raw `text` joins the searchable fields
-- [ ] Recovery drills: kill inside the §4.3 crash window and recover; reindex from scratch; restore-from-R2 walkthrough
+- [ ] Relevance tuning from v1 logs: hamza/diacritics variants (via `normVersion`), Arabic typo tolerance (`minWordSizeForTypos`), chunk duration, title weight, `distinctAttribute` revisit, hybrid `semanticRatio` if M4.5 was adopted; then decide whether raw `text` joins the searchable fields
+- [ ] Recovery drills: kill inside the §4.3 crash window and recover; reindex from scratch; restore-from-R2 walkthrough; Convex snapshot restore walked through once
