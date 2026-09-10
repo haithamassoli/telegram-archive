@@ -569,18 +569,16 @@ def test_an_approved_lesson_whose_parts_changed_is_handed_back_to_a_human():
     )
 
 
-def test_a_youtube_link_is_recorded_only_when_the_lesson_itself_names_it():
+def test_a_lesson_has_exactly_one_source_and_it_is_telegram():
+    """No YouTube rows: those uploads are the same recordings, republished late."""
     world = World()
     world.message("عنوان 👇\nhttps://youtu.be/abc123")
     world.message(audio=[("a" * 64, 320_000)])
     world.message("https://youtu.be/unrelated")  # the republication stream
     world.run(organize.organize, channels=("alkulife",))
     sources = world.convex.sources["lesson0"]
-    kinds = [s["sourceType"] for s in sources]
-    assert kinds.count("telegram") == 1 and sources[0]["isPrimary"]
-    assert [s["url"] for s in sources if s["sourceType"] == "youtube"] == [
-        "https://youtu.be/abc123"
-    ], "a trailing link is not evidence of anything"
+    assert [s["sourceType"] for s in sources] == ["telegram"]
+    assert sources[0]["isPrimary"] and sources[0]["url"].startswith("https://t.me/")
 
 
 # --------------------------------------------------------------------------- #

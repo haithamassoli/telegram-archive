@@ -55,7 +55,6 @@ PART_GAP_S = 600
 WHOLE_LESSON_MS = 20 * 60 * 1000
 
 URL = re.compile(r"https?://\S+")
-YOUTUBE = re.compile(r"https?://(?:www\.)?(?:youtube\.com/\S+|youtu\.be/\S+)")
 # Announcements, live-stream state, channel promotion, postponements. Every one
 # of these was counted in the corpus before it was written down.
 NOTICE = re.compile(
@@ -638,7 +637,7 @@ def organize(
                 sources = convex.mutation(
                     "mutations:replaceLessonSources",
                     lessonId=lesson["id"],
-                    sources=sources_of(candidate, channel["_id"], title_source),
+                    sources=sources_of(candidate, channel["_id"]),
                 )
                 totals["lessons"] += 1
                 totals["parts"] += len(parts)
@@ -660,43 +659,29 @@ def organize(
         return totals
 
 
-def sources_of(candidate: dict, channel_id: str, title_source: str) -> list[dict]:
-    """`lessonSources` for one lesson: Telegram primary, YouTube only if named.
+def sources_of(candidate: dict, channel_id: str) -> list[dict]:
+    """`lessonSources` for one lesson: the Telegram message it came from.
 
-    The plan expected trailing YouTube links to confirm a grouping. They cannot:
-    of 3,977 bare-link messages in @doros_alkulify, 1,417 sit between two other
-    links and only 648 are followed by audio, because the links are a separate
-    republication stream posted hours to days later in batches. Position cannot
-    bind a link to a lesson, so a link is recorded only when it appears inside
-    the lesson's own title or caption — where it is an authored fact, not an
-    inference. The rest wait for the v1 YT↔TG map (§8).
+    No YouTube rows. The plan expected trailing YouTube links to confirm a
+    grouping, and the corpus already said they cannot — of 3,977 bare-link
+    messages 1,417 sit between two other links and only 648 are followed by
+    audio, because the links are posted in batches hours to days later. The
+    archive's owner then settled the question outright: those uploads are the
+    same recordings republished late, so they are not a second source of
+    anything. `semanticType = "link"` still marks the messages; nothing binds
+    them to a lesson.
     """
     first = candidate["parts"][0]
-    sources = [
+    origin = candidate["title"] or first
+    return [
         {
             "sourceType": "telegram",
-            "url": (candidate["title"] or first)["telegramUrl"],
+            "url": origin["telegramUrl"],
             "channelId": channel_id,
-            "messageId": (candidate["title"] or first)["id"],
+            "messageId": origin["id"],
             "isPrimary": True,
         }
     ]
-    owned = [candidate["title"]] if candidate["title"] else []
-    owned += candidate["parts"]
-    seen = set()
-    for message in owned:
-        for url in YOUTUBE.findall(message["text"] or ""):
-            if url in seen:
-                continue
-            seen.add(url)
-            sources.append(
-                {
-                    "sourceType": "youtube",
-                    "url": url,
-                    "isPrimary": False,
-                }
-            )
-    return sources
 
 
 # --------------------------------------------------------------------------- #
