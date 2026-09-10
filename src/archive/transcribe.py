@@ -388,6 +388,7 @@ def transcribe(
     sha256s: tuple[str, ...] = (),
     config_hash: str = CONFIG_HASH,
     shard: tuple[int, int] | None = None,
+    ignore_cap: bool = False,
     log=_log,
 ) -> dict:
     """M2's batch command: drive every un-transcribed audio binary to `done`.
@@ -432,6 +433,23 @@ def transcribe(
         if capped:
             log(f"  {len(capped)} failure(s) past the {FAILURE_ATTEMPT_CAP}-attempt cap")
 
+        # §4.6's other half. A file that kills the process outright never reaches
+        # `_fail`, so the `failures` table never hears about it and the same batch
+        # is selected again, forever. Its one honest record is the attempt counted
+        # when it was claimed: `upsertPartTranscript` increments `attempts` on
+        # every `processing` mark, crash or no crash. Reading that is what turns a
+        # poison file from a wedged campaign into a skipped file.
+        poison = [
+            row
+            for row in rows
+            if is_audio(row)
+            and needs_work(row)
+            and row.get("attempts", 0) >= FAILURE_ATTEMPT_CAP
+            and in_shard(row["sha256"], shard)
+        ]
+        if poison and not ignore_cap:
+            log(f"  {len(poison)} file(s) past the {FAILURE_ATTEMPT_CAP}-claim cap")
+
         wanted = set(sha256s)
         candidates = [
             row
@@ -439,6 +457,7 @@ def transcribe(
             if is_audio(row)
             and needs_work(row)
             and in_shard(row["sha256"], shard)
+            and (ignore_cap or row.get("attempts", 0) < FAILURE_ATTEMPT_CAP)
             and row["sha256"] not in capped
             and (not wanted or row["sha256"] in wanted)
         ]

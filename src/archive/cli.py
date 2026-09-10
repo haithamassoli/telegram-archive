@@ -197,6 +197,7 @@ def cmd_transcribe(args) -> int:
             batch_size=args.batch_size,
             sha256s=tuple(args.sha256),
             shard=args.shard,
+            ignore_cap=args.ignore_cap,
         )
     except StageBusy as exc:
         print(f"not started: {exc}")
@@ -306,6 +307,11 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=transcribe.BATCH,
         help=f"files per transcriber call (default {transcribe.BATCH})",
+    )
+    asr.add_argument(
+        "--ignore-cap",
+        action="store_true",
+        help="select files past the claim cap too — the human's retry, use with --batch-size 1",
     )
     asr.add_argument(
         "--shard",

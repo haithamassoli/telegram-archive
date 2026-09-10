@@ -817,6 +817,34 @@ def test_slim_published_keeps_one_copy_of_the_implementation_block():
     assert kept == fat_artifact()["implementation"]
 
 
+def test_a_file_that_killed_the_process_is_left_out_of_later_runs():
+    """A hard crash never reaches `_fail`, so the claim counter is its only trace.
+
+    `upsertPartTranscript` counts every `processing` mark, crash or no crash, so a
+    poison file's count climbs while the `failures` table stays silent. Selection
+    has to read that count, or the same batch is chosen forever — which is exactly
+    what wedged two Kaggle shards for four hours.
+    """
+    world = World()
+    world.blob(SHA["a"])
+    world.blob(SHA["b"])
+    world.convex.transcripts[(SHA["b"], CONFIG_HASH)] = {
+        "_id": "partTranscripts#seed",
+        "sha256": SHA["b"],
+        "configHash": CONFIG_HASH,
+        "status": "failed",
+        "attempts": transcribe.FAILURE_ATTEMPT_CAP,
+    }
+
+    result = world.run()
+    assert result["transcribed"] == 1, "the healthy file still runs"
+    assert (SHA["a"], CONFIG_HASH) in world.convex.transcripts
+    assert world.convex.transcripts[(SHA["b"], CONFIG_HASH)]["status"] == "failed"
+
+    forced = world.run(ignore_cap=True)
+    assert forced["candidates"] == 1, "--ignore-cap is the human's way back in"
+
+
 def test_shards_split_the_archive_into_disjoint_wholes():
     shas = [hashlib.sha256(str(i).encode()).hexdigest() for i in range(500)]
     for count in (2, 3, 4):
