@@ -198,3 +198,123 @@ export const mediaObjectsPage = query({
     };
   },
 });
+
+// M3 selection: one page of a channel's messages in telegramMessageId order,
+// each carrying the binaries it links. Ordering by message id is what makes the
+// Organizer's "title then the audio that follows it" rule expressible at all,
+// and joining the media here saves a round trip per message on a 26k-row scan.
+export const messagesPage = query({
+  args: {
+    channelId: v.id("channels"),
+    cursor: v.number(),
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("telegramMessages")
+      .withIndex("by_channel_message", (q) =>
+        q.eq("channelId", args.channelId).gt("telegramMessageId", args.cursor),
+      )
+      .take(args.limit);
+    const messages = [];
+    for (const row of rows) {
+      const links = await ctx.db
+        .query("messageMedia")
+        .withIndex("by_message", (q) => q.eq("messageId", row._id))
+        .collect();
+      const media = [];
+      for (const link of links) {
+        const object = await ctx.db.get(link.mediaObjectId);
+        if (object === null) {
+          throw new Error(
+            `integrity error: messageMedia ${link._id} points at a missing mediaObject`,
+          );
+        }
+        media.push({
+          mediaObjectId: object._id,
+          originalFileName: link.originalFileName ?? null,
+          sha256: object.sha256,
+          ext: object.ext,
+          mimeType: object.mimeType ?? null,
+          durationMs: object.durationMs ?? null,
+        });
+      }
+      messages.push({
+        id: row._id,
+        telegramMessageId: row.telegramMessageId,
+        date: row.date,
+        editDate: row.editDate ?? null,
+        deletedAt: row.deletedAt ?? null,
+        text: row.text ?? null,
+        replyToMessageId: row.replyToMessageId ?? null,
+        groupedId: row.groupedId ?? null,
+        telegramUrl: row.telegramUrl,
+        mediaType: row.mediaType,
+        semanticType: row.semanticType,
+        classifierVersion: row.classifierVersion ?? null,
+        isForwarded: row.isForwarded,
+        forwardedFromChannel: row.forwardedFromChannel ?? null,
+        media,
+      });
+    }
+    return {
+      messages,
+      nextCursor: rows.length
+        ? rows[rows.length - 1].telegramMessageId
+        : null,
+    };
+  },
+});
+
+// Phase 3.5 selection: lessons with their ordered parts. `lessonTranscriptR2Key`
+// rides along so the builder can take the §4.2 fast path — a pointer already
+// naming the current assemblyHash + configHash means there is nothing to build.
+export const lessonsPage = query({
+  args: { cursor: v.string(), limit: v.number() },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("lessons")
+      .withIndex("by_lesson_key", (q) => q.gt("lessonKey", args.cursor))
+      .take(args.limit);
+    const lessons = [];
+    for (const row of rows) {
+      const parts = await ctx.db
+        .query("lessonParts")
+        .withIndex("by_lesson_order", (q) => q.eq("lessonId", row._id))
+        .collect();
+      parts.sort((a, b) => a.order - b.order);
+      const withSha = [];
+      for (const part of parts) {
+        const object = await ctx.db.get(part.mediaObjectId);
+        if (object === null) {
+          throw new Error(
+            `integrity error: lessonPart ${part._id} points at a missing mediaObject`,
+          );
+        }
+        withSha.push({
+          sha256: object.sha256,
+          order: part.order,
+          offsetMs: part.offsetMs,
+          durationMs: part.durationMs,
+        });
+      }
+      lessons.push({
+        id: row._id,
+        lessonKey: row.lessonKey,
+        assemblyHash: row.assemblyHash,
+        rawTitle: row.rawTitle,
+        normalizedTitle: row.normalizedTitle,
+        seriesName: row.seriesName ?? null,
+        seriesEpisode: row.seriesEpisode ?? null,
+        reviewStatus: row.reviewStatus,
+        durationMs: row.durationMs,
+        lessonTranscriptR2Key: row.lessonTranscriptR2Key ?? null,
+        parts: withSha,
+      });
+    }
+    return {
+      lessons,
+      nextCursor: rows.length ? rows[rows.length - 1].lessonKey : null,
+    };
+  },
+});

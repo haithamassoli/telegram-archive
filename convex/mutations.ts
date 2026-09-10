@@ -484,3 +484,221 @@ export const resolveFailure = mutation({
     return { resolved: true };
   },
 });
+
+// --------------------------------------------------------------------------- //
+// M3 — Organizer (Phase 3) and Lesson Transcript Builder (Phase 3.5)
+//
+// Every mutation below reports whether it actually changed anything. That is
+// not decoration: M3's exit criterion is "a full Organizer re-run on unchanged
+// data is a no-op", and `changed` is how the run proves it.
+// --------------------------------------------------------------------------- //
+
+const semanticTypeValue = v.union(
+  v.literal("article"),
+  v.literal("lesson_title"),
+  v.literal("link"),
+  v.literal("notice"),
+  v.literal("other"),
+  v.null(),
+);
+
+export const classifyMessages = mutation({
+  args: {
+    updates: v.array(
+      v.object({
+        messageId: v.id("telegramMessages"),
+        semanticType: semanticTypeValue,
+        classifierVersion: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    let changed = 0;
+    for (const update of args.updates) {
+      const row = await ctx.db.get(update.messageId);
+      if (row === null) {
+        throw new Error(`no telegramMessage ${update.messageId}`);
+      }
+      if (
+        row.semanticType === update.semanticType &&
+        row.classifierVersion === update.classifierVersion
+      ) {
+        continue;
+      }
+      await ctx.db.patch(update.messageId, {
+        semanticType: update.semanticType,
+        classifierVersion: update.classifierVersion,
+      });
+      changed += 1;
+    }
+    return { changed };
+  },
+});
+
+export const upsertArticle = mutation({
+  args: {
+    messageId: v.id("telegramMessages"),
+    channelId: v.id("channels"),
+    title: v.string(),
+    normalizedTitle: v.string(),
+    titleSource: v.string(),
+    text: v.string(),
+    normalizedText: v.string(),
+    date: v.number(),
+    telegramUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("articles")
+      .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
+      .collect();
+    const existing = exactlyZeroOrOne(
+      rows,
+      `articles.messageId=${args.messageId}`,
+    );
+    if (existing === null) {
+      const id = await ctx.db.insert("articles", args);
+      return { id, created: true, changed: true };
+    }
+    const same = (Object.keys(args) as (keyof typeof args)[]).every(
+      (key) => existing[key as keyof typeof existing] === args[key],
+    );
+    if (same) {
+      return { id: existing._id, created: false, changed: false };
+    }
+    // indexedAt/indexVersion belong to Phase 4 and are left untouched here: a
+    // changed article is reindexed because its text moved, not because M3 ran.
+    await ctx.db.patch(existing._id, args);
+    return { id: existing._id, created: false, changed: true };
+  },
+});
+
+// Parts are a set, not independently upsertable rows: a rerun that drops a part
+// must not leave it orphaned under the lesson. Replace-all in one transaction,
+// and only when the set actually differs.
+export const replaceLessonParts = mutation({
+  args: {
+    lessonId: v.id("lessons"),
+    parts: v.array(
+      v.object({
+        messageId: v.optional(v.id("telegramMessages")),
+        mediaObjectId: v.id("mediaObjects"),
+        order: v.number(),
+        durationMs: v.number(),
+        offsetMs: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("lessonParts")
+      .withIndex("by_lesson_order", (q) => q.eq("lessonId", args.lessonId))
+      .collect();
+    existing.sort((a, b) => a.order - b.order);
+    const wanted = [...args.parts].sort((a, b) => a.order - b.order);
+    const same =
+      existing.length === wanted.length &&
+      existing.every(
+        (row, i) =>
+          row.mediaObjectId === wanted[i].mediaObjectId &&
+          row.order === wanted[i].order &&
+          row.offsetMs === wanted[i].offsetMs &&
+          row.durationMs === wanted[i].durationMs &&
+          (row.messageId ?? null) === (wanted[i].messageId ?? null),
+      );
+    if (same) {
+      return { changed: false, count: existing.length };
+    }
+    for (const row of existing) {
+      await ctx.db.delete(row._id);
+    }
+    for (const part of wanted) {
+      await ctx.db.insert("lessonParts", { lessonId: args.lessonId, ...part });
+    }
+    return { changed: true, count: wanted.length };
+  },
+});
+
+export const replaceLessonSources = mutation({
+  args: {
+    lessonId: v.id("lessons"),
+    sources: v.array(
+      v.object({
+        sourceType: v.union(
+          v.literal("telegram"),
+          v.literal("youtube"),
+          v.literal("legacy"),
+        ),
+        url: v.string(),
+        externalId: v.optional(v.string()),
+        channelId: v.optional(v.id("channels")),
+        messageId: v.optional(v.id("telegramMessages")),
+        isPrimary: v.boolean(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("lessonSources")
+      .withIndex("by_lesson", (q) => q.eq("lessonId", args.lessonId))
+      .collect();
+    const key = (row: { sourceType: string; url: string }) =>
+      `${row.sourceType} ${row.url}`;
+    const before = existing.map(key).sort().join("\n");
+    const after = args.sources.map(key).sort().join("\n");
+    if (before === after) {
+      return { changed: false, count: existing.length };
+    }
+    for (const row of existing) {
+      await ctx.db.delete(row._id);
+    }
+    for (const source of args.sources) {
+      await ctx.db.insert("lessonSources", {
+        lessonId: args.lessonId,
+        ...source,
+      });
+    }
+    return { changed: true, count: args.sources.length };
+  },
+});
+
+// Phase 3.5, second half of the write-order law: the artifact is in R2 before
+// this pointer moves. Kept out of `upsertLessonByKey` so the builder can obey
+// that law without re-sending a whole composition.
+export const setLessonTranscript = mutation({
+  args: {
+    lessonId: v.id("lessons"),
+    lessonTranscriptR2Key: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.lessonId);
+    if (row === null) {
+      throw new Error(`no lesson ${args.lessonId}`);
+    }
+    if (row.lessonTranscriptR2Key === args.lessonTranscriptR2Key) {
+      return { changed: false };
+    }
+    await ctx.db.patch(args.lessonId, {
+      lessonTranscriptR2Key: args.lessonTranscriptR2Key,
+    });
+    return { changed: true };
+  },
+});
+
+// §0 amendment 1 / §4.7's other half. An approved lesson is frozen against
+// recomposition, but a source message edited or deleted underneath it must not
+// be silently kept either. The only legal move is to hand it back to a human.
+export const demoteLesson = mutation({
+  args: { lessonId: v.id("lessons"), reason: v.string() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.lessonId);
+    if (row === null) {
+      throw new Error(`no lesson ${args.lessonId}`);
+    }
+    if (row.reviewStatus !== "approved") {
+      return { demoted: false };
+    }
+    await ctx.db.patch(args.lessonId, { reviewStatus: "needs_review" });
+    return { demoted: true };
+  },
+});

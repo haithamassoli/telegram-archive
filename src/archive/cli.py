@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import gates, ingest, legacy, telegram, transcribe, verify
+from . import gates, ingest, legacy, organize, telegram, transcribe, verify
 from .config import CONFIG_HASH, M1_CHANNELS, PINNED_CONFIG, canonical_json
 
 STATUS_MARK = {"pass": "PASS", "fail": "FAIL", "pending": "PEND"}
@@ -234,6 +234,40 @@ def cmd_slim(args) -> int:
     return 0
 
 
+def cmd_organize(args) -> int:
+    """M3: classify, extract articles, group lessons, compose."""
+    from .pipeline import StageBusy
+
+    try:
+        result = organize.organize(
+            channels=tuple(args.channels) or M1_CHANNELS, limit=args.limit
+        )
+    except StageBusy as exc:
+        print(f"not started: {exc}")
+        return 1
+    print(
+        f"{result['lessons']} lesson(s), {result['articles']} article(s), "
+        f"{result['changed']} write(s), {result['needsReview']} needing review"
+    )
+    return 0
+
+
+def cmd_lesson_transcripts(args) -> int:
+    """Phase 3.5: a current lesson-transcript artifact per lesson."""
+    from .pipeline import StageBusy
+
+    try:
+        result = organize.build_lesson_transcripts(limit=args.limit)
+    except StageBusy as exc:
+        print(f"not started: {exc}")
+        return 1
+    print(
+        f"{result['built']} built, {result['current']} already current, "
+        f"{result['failed']} failed"
+    )
+    return 1 if result["failed"] else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="archive")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -343,6 +377,17 @@ def main(argv: list[str] | None = None) -> int:
         "--dry-run", action="store_true", help="report the saving, write nothing"
     )
     thin.set_defaults(func=cmd_slim)
+
+    org = sub.add_parser("organize", help="M3: classify, group and compose lessons")
+    org.add_argument("channels", nargs="*", help="channel usernames")
+    org.add_argument("--limit", type=int, help="only the first N messages per channel")
+    org.set_defaults(func=cmd_organize)
+
+    lt = sub.add_parser(
+        "lesson-transcripts", help="Phase 3.5: build lesson transcript artifacts"
+    )
+    lt.add_argument("--limit", type=int, help="stop after N lessons this run")
+    lt.set_defaults(func=cmd_lesson_transcripts)
 
     args = parser.parse_args(argv)
     return args.func(args)
