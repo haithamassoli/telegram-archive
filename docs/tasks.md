@@ -1,6 +1,6 @@
 # Telegram Knowledge Archive — Milestones & Tasks
 
-Derived from `docs/telegram_archive_plan.md` (v2.3, FROZEN). Milestone numbers mirror plan phases for traceability; § references point into the plan.
+Derived from `docs/telegram_archive_plan.md` (v2.4, FROZEN). Milestone numbers mirror plan phases for traceability; § references point into the plan.
 
 ## Sequencing
 
@@ -16,16 +16,16 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 ## M0 — Foundations, gates, legacy export (Phase 0, ~½–1 day)
 
 **Goal:** every irreversible decision pinned, every external dependency proven, v1 data safe.
-**Exit:** `configHash` computed and logged; codec decision recorded; GPU benchmark numbers recorded and M2 schedule derived; legacy export verified in R2; transcribe doctor passes; Convex/R2/Meilisearch reachable with scoped keys.
+**Exit:** `configHash` computed and logged; playback gate recorded; GPU benchmark numbers recorded and M2 schedule derived; legacy export verified in R2; transcribe doctor passes; Convex/R2/Meilisearch reachable with scoped keys.
 
 - [x] Telegram access — **decided: archiving runs on the personal account `@haithamassoli`, not a dedicated one.** The §9 mitigation for "Telegram limits/ban" is therefore not in place: a ban during M1 would cost the owner's own account rather than a throwaway. The rest of that mitigation still applies (takeout, pacing, resumable checkpoints), and the archive stays resumable either way. Session at `secrets/archive.session` (mode 600, gitignored), created by `archive telegram-login`; the gate asks Telegram whether it is really signed in, because Telethon writes a complete-looking session file during the key exchange, before it prompts for a phone.
 - [x] Accept HF model terms; set `HF_TOKEN`/`HF_HOME` — verified by the `model-access` gate (pinned model+revision readable with the token)
 - [x] Pin transcription config → `src/archive/config.py`; `configHash=d27d1fb0a633fb8273f793655bd8ef82e6100da90f63340d1f9bb16c609bc4d5`, recorded in `m0.gates.json`; drift from the pin or from the package default fails the `config-pin` gate (§0.5)
 - [x] Benchmark the actual GPU: **Apple MPS (M-series), RTF 23.5x, 4.14 GB resident, 0.29 files per ASR batch** on 25.9 min of real archive audio (a 4.5-min voice note + a 21-min lesson) — `archive bench` wrote it to `m0.gates.json`. Projected M2 runtime for the archive's 2,926.6 audio hours: **124.3 h ≈ 5.2 days of continuous GPU**, so M2 is a background campaign, not a sitting. Two caveats recorded with the numbers: `filesPerBatch` is below 1 because a long lesson spans several ASR batches (it is files ÷ batches, not a batch size), and MPS has no peak-memory counter, so the 4.14 GB is a live driver reading taken while the model is resident — the fix that made it meaningful was sampling it before `close()` instead of after.
-- [ ] Codec gate: Opus vs AAC seek/Range behavior on iOS Safari, Android, desktop — record `decision` + `testedOn` in `m0.gates.json`
+- [ ] Playback gate (v2.4 — was the Opus/AAC codec gate): nothing is re-encoded any more, so the question is whether the archive's **own** containers seek and honour Range on iOS Safari, Android, desktop. Test the real extensions in `mediaObjects.ext`, not a hypothetical output codec — record `decision` + `testedOn` in `m0.gates.json`
 - [x] Legacy export first (§8.1) — 3387 objects / 39.8 MB under `legacy/assoli-v1/`: all 3379 `articles/` (posts, fatwas, books, tg) plus `videos.json`, `playlists.json`, `eval-questions*.json` (the §8.4 relevance set), `eval-articles.json`, `domain-synonyms.json`, wayback logs. Verified against the manifest. **YouTube transcripts deliberately excluded** — `segments/` (177 MB) and `tafrigh/output/` (1.7 GB) stay on local disk only; `meili/` (10 GB) is a rebuildable index. v1 untouched.
 - [x] Provision Convex — schema (§2) + the four atomic mutations (plus lock heartbeat/release) deployed to `haitham-assoli:alkulify` dev (`friendly-cheetah-400`); uniqueness, lock hand-off, attempt counting and merge invalidation exercised against the live deployment
-- [x] Provision R2 — both buckets reachable with a real account token. Note: the token is scoped to *both* buckets rather than one key pair per bucket; `lessons-media` gets its first write in M5, split the keys before then. Custom domain still to do (M5).
+- [x] Provision R2 — both buckets reachable with a real account token. **v2.4: `lessons-media` is dropped** along with merging, so the key split and the custom domain it needed are cancelled. One private bucket; audio reaches listeners through signed URLs (plan §5). The over-scoped token should still be narrowed to the archive bucket alone.
 - [ ] Provision Meilisearch: instance, admin key, search-only key
 - [x] Repo skeleton: Python project (`src/archive/`), config module holding the pinned config, `.gitignore` covering `.env`, `*.session`, `secrets/`, temp dirs; `tests/test_m0.py`
 
@@ -109,7 +109,7 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 - [ ] Full `reindex` from scratch proven; `indexedAt`/`indexVersion` stamped
 - [ ] Import v1 manual corrections as transcript overrides (§8.3) — the only data no GPU can reproduce
 - [ ] UI: RTL, articles/audio tabs, excerpts, series facets, Telegram links
-- [ ] Raw-part playback via short-lived signed R2 URLs (Range OK; refresh on 403); raw bucket stays private forever
+- [ ] Part playback via short-lived signed R2 URLs (Range OK; refresh on 403); the bucket stays private forever. **v2.4: this is the permanent playback path, not an interim** — hardening moves to M5
 - [ ] Relevance baseline: replay v1 query logs against v1 and v2; record results (§8.4)
 
 ## M4.5 — Hybrid semantic search (bge-m3 — gated, optional; plan Phase 4.5)
@@ -123,16 +123,20 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 
 ---
 
-## M5 — Merged playback (Phase 5)
+## M5 — Continuous multi-part playback (Phase 5)
 
-**Goal:** one continuous public audio file per lesson, seekable and deep-linkable.
-**Exit:** merged audio exists for all transcribed multi-part lessons; playback and seek verified on the gated codec across the M0 device matrix.
+**Goal:** a lesson plays as one continuous thing without ever becoming one file. A reader must not be able to tell how many parts it has.
+**Exit:** on the M0 device matrix — seek across a part boundary, resume mid-part, and a lock screen showing the **lesson's** duration, not a part's.
 
-- [ ] Merge worker: concat-demuxer fast path, re-encode fallback to the M0-gated codec; `mergeStatus` lifecycle; write-order law
-- [ ] Upload `lessons/{lessonId}/{mergedSha256}.{ext}` to the public bucket; warn when Σ part durations vs merged duration differs by >500 ms
-- [ ] Extend `reconcile-artifacts` to merged audio
-- [ ] Player: merged playback, seek `max(0, startMs − 2000)`, `?t=` links, autoplay handling
-- [ ] Chunk re-attribution to the merged timeline = pure reindex
+*(v2.4: merging is removed. See plan §12 for what was deleted and what it cost.)*
+
+- [ ] Player over the plan-§5 virtual timeline: locate the part where `offsetMs ≤ t < offsetMs + durationMs`, play at `(t − offsetMs)/1000`; seek `max(0, startMs − 2000)`; `?t=` deep links
+- [ ] Boundary crossing: one `<audio>`, `src` swapped on `ended`. **Measure the gap before building more** — only if it is audible, add a second element unlocked inside the first user gesture (`play()` then immediate `pause()`), which iOS Safari requires before it will honour a programmatic `play()`
+- [ ] Prefetch the next part at ~30 s remaining. Never prefetch the whole lesson — a ten-part lesson would burn a mobile reader's data on open
+- [ ] `navigator.mediaSession.setPositionState()` fed the lesson duration/position. Skipping this leaks the part boundaries onto the lock screen, which is the one thing this milestone exists to hide
+- [ ] Part boundaries visible in the review UI, hidden in the public player — same component, one prop
+- [ ] Harden the signed-URL endpoint (moved up from M7): rate limit, 403 refresh mid-listen, Range verified. It is now the only path audio takes to a listener
+- [ ] Confirm nothing in the search index changed: chunks were stamped against this timeline in M4
 
 **Cutover (gated by §8.5 — only when coverage ≥ v1 AND log-replay equal-or-better):**
 - [ ] Run the parity check (coverage diff + query-log replay); record go/no-go
@@ -146,9 +150,10 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 **Exit:** timers running unattended for a week; one approve → regen → reindex cycle verified end-to-end; an edited source message demotes its approved lesson.
 
 - [ ] Review UI: `needs_review` queue ordered by confidence; preview, reorder, add/remove parts, split, merge, rename
-- [ ] Approve flow: approve → new `assemblyHash` → lesson-scoped regen (lesson transcript + remerge + reindex)
+- [ ] Approve flow: approve → recompute `lessonParts.order` then `offsetMs` cumulatively then `assemblyHash` → lesson-scoped regen (lesson transcript + reindex)
+- [ ] Excluding a part must survive the next Organizer run. Today the only thing protecting an edit is §4.7 freezing `approved` lessons, so an exclusion on an `auto` lesson comes back on the next pass — either approve at exclusion time, or add a flag. Decide when the review UI is built, not before
 - [ ] Incremental sync on a normal session (no takeout): messages > `lastMessageId` + ~300-message recheck for edits/`deletedAt`; affected `approved` lessons demote to `needs_review` (§4.7), never recompose
-- [ ] Timers under §4.5 locks — one dumb wrapper script per cadence chaining the existing self-locking commands: every 15 min sync → transcribe-pending → organize → index-pending; merge nightly (+ M4.5 embed batch if adopted); weekly reconcile + Convex export
+- [ ] Timers under §4.5 locks — one dumb wrapper script per cadence chaining the existing self-locking commands: every 15 min sync → transcribe-pending → organize → index-pending; nightly M4.5 embed batch if adopted (nothing otherwise — the nightly merge is gone); weekly reconcile + Convex export
 - [ ] Placement per plan Phase 6: launchd LaunchAgents on the Mac (the GPU host) now; move to systemd on the VPS at cutover. Stage split across VPS + Mac is legal under the existing locks; CPU transcription on the VPS is legal because transcript identity is the pinned config, not the device
 - [ ] Failure push: end of each wrapper run, non-ok `pipelineRuns` or new unresolved `failures` → one Telegram message via a send-only bot token (~10 lines; the bot never reads channels)
 - [ ] Human-decision backup: weekly `npx convex export` → `backups/convex/{date}.zip` in the private bucket — approvals/corrections are the one thing no GPU can regenerate
@@ -163,6 +168,6 @@ Every batch command in every milestone obeys §4: R2-artifact-first write order,
 - [ ] Ops page: stage counts, unresolved `failures`, `pipelineLocks` state, `pipelineRuns` history (last run, duration, counts), per-channel sync status
 - [ ] Schedule `reconcile-artifacts` weekly
 - [ ] Retry wrappers on network/API calls; temp cleanup
-- [ ] Security: rate-limit the signed-URL endpoint; least-privilege key audit; search-only Meilisearch key client-side
+- [ ] Security: least-privilege key audit; search-only Meilisearch key client-side. (Signed-URL rate limiting moved to M5 — v2.4 made that endpoint load-bearing)
 - [ ] Relevance tuning from v1 logs: hamza/diacritics variants (via `normVersion`), Arabic typo tolerance (`minWordSizeForTypos`), chunk duration, title weight, `distinctAttribute` revisit, hybrid `semanticRatio` if M4.5 was adopted; then decide whether raw `text` joins the searchable fields
 - [ ] Recovery drills: kill inside the §4.3 crash window and recover; reindex from scratch; restore-from-R2 walkthrough; Convex snapshot restore walked through once

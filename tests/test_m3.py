@@ -21,6 +21,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from archive import organize, pipeline
+
+import backend
 from archive.config import CONFIG_HASH, PINNED_CONFIG
 
 REPO = Path(__file__).resolve().parents[1]
@@ -643,8 +645,7 @@ def test_a_recomposed_lesson_gets_a_new_artifact_by_identity_alone():
 def test_fake_convex_matches_the_deployed_signatures():
     import inspect
 
-    source = (REPO / "convex" / "mutations.ts").read_text()
-    source += (REPO / "convex" / "queries.ts").read_text()
+    source = backend.source()
     exported = set(re.findall(r"export const (\w+) = (?:mutation|query)\(", source))
     fake = FakeConvex()
     used = {
@@ -680,7 +681,7 @@ def test_fake_convex_matches_the_deployed_signatures():
         }
         assert params <= declared, f"{name}: fake takes {params - declared}"
 
-    schema = (REPO / "convex" / "schema.ts").read_text()
+    schema = backend.schema()
     for table, needed in {
         "lessons": {"seriesName", "seriesEpisode", "groupingConfidence", "reviewStatus"},
         "lessonParts": {"offsetMs", "order", "mediaObjectId"},

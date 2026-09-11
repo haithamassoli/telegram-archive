@@ -10,7 +10,7 @@ import json
 import urllib.error
 import urllib.request
 
-from . import legacy, r2, telegram
+from . import convex, legacy, r2, telegram
 from .config import CONFIG_HASH, PINNED_CONFIG, REPO_ROOT, check_revision_drift, env
 
 RECORD_PATH = REPO_ROOT / "m0.gates.json"
@@ -77,17 +77,15 @@ def gate_r2() -> tuple[str, str]:
         s3 = r2.client()
     except RuntimeError as exc:
         return "pending", str(exc)
-    results = []
-    for which in (r2.ARCHIVE, r2.MEDIA):
-        name = r2.bucket(which)
-        try:
-            s3.head_bucket(Bucket=name)
-            results.append(f"{name}=ok")
-        except Exception as exc:
-            reason = str(exc).split(": ", 1)[-1][:120]
-            results.append(f"{name}=FAILED ({reason})")
-    status = "pass" if all(part.endswith("=ok") for part in results) else "fail"
-    return status, ", ".join(results)
+    # One bucket: plan v2.4 dropped merging and with it the public lessons-media
+    # bucket, so there is no second bucket left to reach.
+    name = r2.bucket()
+    try:
+        s3.head_bucket(Bucket=name)
+    except Exception as exc:
+        reason = str(exc).split(": ", 1)[-1][:120]
+        return "fail", f"{name}=FAILED ({reason})"
+    return "pass", f"{name}=ok"
 
 
 def gate_legacy_export() -> tuple[str, str]:
@@ -103,18 +101,24 @@ def gate_legacy_export() -> tuple[str, str]:
 
 
 def gate_convex() -> tuple[str, str]:
-    schema = REPO_ROOT / "convex" / "schema.ts"
-    mutations = REPO_ROOT / "convex" / "mutations.ts"
-    if not (schema.is_file() and mutations.is_file()):
-        return "fail", "convex/schema.ts or convex/mutations.ts missing"
+    """Reachable, and still running *our* functions.
+
+    The schema and mutations live in the site repo (../kashaf-alkulify), which
+    owns this deployment; there is nothing local to stat. So the gate calls a
+    real archive query instead: a Convex push replaces the deployment's entire
+    function set, so a push from a repo that does not carry queries.ts would
+    leave the URL up and this call 404ing. That is the failure worth catching.
+    """
     url = env("CONVEX_URL")
     if not url:
-        return "pending", "schema+mutations written; CONVEX_URL not set (npx convex dev)"
+        return "pending", "CONVEX_URL not set — copy it from ../kashaf-alkulify"
     try:
-        code, _ = _http(url.rstrip("/") + "/version")
+        convex.query("queries:unresolvedFailures", stage="__gate__")
+    except convex.ConvexError as exc:
+        return "fail", f"{url} answered, but queries:unresolvedFailures failed: {exc}"
     except OSError as exc:
         return "fail", f"{url} unreachable: {exc}"
-    return ("pass" if code < 500 else "fail"), f"{url} responded HTTP {code}"
+    return "pass", f"{url} serving the archive functions"
 
 
 def gate_meilisearch() -> tuple[str, str]:
@@ -174,9 +178,13 @@ def gate_gpu_benchmark() -> tuple[str, str]:
 
 
 def gate_codec() -> tuple[str, str]:
+    """Plan v2.4 turned this from "which codec do we encode to?" into "do the
+    archive's own containers seek and honour Range?" — nothing is re-encoded
+    now that merging is gone. Same record shape, so the key stays `codec`.
+    """
     data = _record().get("codec") or {}
     if not data.get("decision"):
-        return "pending", "no codec decision recorded in m0.gates.json"
+        return "pending", "no playback decision recorded in m0.gates.json"
     devices = data.get("testedOn") or []
     if not devices:
         return "fail", "decision recorded but no devices listed under testedOn"
