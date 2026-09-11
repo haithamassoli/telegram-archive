@@ -190,6 +190,18 @@ class FakeConvex:
         self.writes += 1
         return {"changed": True}
 
+    def m_retireSupersededLesson(self, lessonId, reason):
+        row = next(r for r in self.lessons if r["id"] == lessonId)
+        if row.get("deletedAt") is not None:
+            return {"retired": False}
+        if row["reviewStatus"] == "approved" or row.get("partsLocked"):
+            return {"retired": False}
+        self.parts.pop(lessonId, None)
+        self.sources.pop(lessonId, None)
+        row.update(deletedAt=1, durationMs=0, partCount=0)
+        self.writes += 1
+        return {"retired": True}
+
     def m_demoteLesson(self, lessonId, reason):
         row = next(l for l in self.lessons if l["id"] == lessonId)
         if row["reviewStatus"] != "approved":
@@ -465,13 +477,39 @@ def test_two_whole_sittings_in_a_row_stay_two_lessons():
     assert len(lessons) == 2, "45 minutes each is a sitting, not a part"
 
 
-def test_a_long_gap_splits_a_lesson_even_between_short_parts():
+def test_a_pause_in_the_recording_does_not_rename_the_rest_of_the_run():
+    """The bug v1 had: half a run sitting behind a 20-minute pause, untitled."""
     world = World()
     world.message("عنوان 👇")
     first = world.message(audio=[("a" * 64, 320_000)])
     world.message(
         audio=[("b" * 64, 320_000)],
         date=first["date"] + (organize.PART_GAP_S + 60) * 1000,
+    )
+    lessons = _grouped(world)
+    assert len(lessons) == 1, "a bare voice note behind a pause is still a part"
+    assert organize.title_of(lessons[0])[1] == "title_message"
+
+
+def test_a_named_upload_behind_a_pause_is_its_own_lesson():
+    """@doros_alkulify's re-upload batches: N named files under one header."""
+    world = World()
+    world.message("الدروس بصيغة أخرى 👇")
+    first = world.message(audio=[("a" * 64, 320_000, "الجامع 7.m4a")])
+    world.message(
+        audio=[("b" * 64, 320_000, "الجامع 8.m4a")],
+        date=first["date"] + (organize.PART_GAP_S + 60) * 1000,
+    )
+    assert len(_grouped(world)) == 2, "a file that names itself can be a lesson"
+
+
+def test_even_a_bare_part_splits_once_the_pause_stops_being_a_pause():
+    world = World()
+    world.message("عنوان 👇")
+    first = world.message(audio=[("a" * 64, 320_000)])
+    world.message(
+        audio=[("b" * 64, 320_000)],
+        date=first["date"] + (organize.RUN_GAP_S + 60) * 1000,
     )
     assert len(_grouped(world)) == 2
 
@@ -570,6 +608,45 @@ def test_a_second_run_over_unchanged_data_writes_nothing():
     assert "upsertLessonByKey" not in world.convex.calls[calls:], (
         "a no-op rerun still spent a round trip per lesson"
     )
+
+
+def test_a_row_grouping_no_longer_composes_is_retired():
+    """A regrouping merges two lessons into one; the row left behind lists audio
+    its neighbour now plays, so it has to stop existing — except when a human
+    owns it, and except when it belongs to a channel this run never scanned.
+    """
+    world = lesson_world()
+    world.run(organize.organize, channels=("alkulife",))
+
+    def orphan(key, **kw):
+        row = {
+            "id": f"orphan-{key}",
+            "lessonKey": key,
+            "assemblyHash": "x",
+            "rawTitle": "",
+            "normalizedTitle": "",
+            "reviewStatus": "needs_review",
+            "groupingVersion": organize.GROUPING_VERSION,
+            "titleParserVersion": organize.TITLE_PARSER_VERSION,
+            "durationMs": 0,
+            "partCount": 0,
+            "lessonTranscriptR2Key": None,
+            **kw,
+        }
+        world.convex.lessons.append(row)
+        world.convex.parts[row["id"]] = []
+        return row
+
+    superseded = orphan("tg:alkulife:0:900")
+    approved = orphan("tg:alkulife:0:901", reviewStatus="approved")
+    elsewhere = orphan("tg:doros_alkulify:0:902")
+
+    result = world.run(organize.organize, channels=("alkulife",))
+    assert result["retired"] == 1, "exactly the one row nothing composes any more"
+    assert superseded["deletedAt"] is not None
+    assert superseded["id"] not in world.convex.parts, "its parts went with it"
+    assert approved.get("deletedAt") is None, "§4.7: a human's call, not a rerun's"
+    assert elsewhere.get("deletedAt") is None, "unvisited is not superseded"
 
 
 # --------------------------------------------------------------------------- #
@@ -815,6 +892,7 @@ def test_fake_convex_matches_the_deployed_signatures():
         "replaceLessonSources",
         "setLessonTranscript",
         "demoteLesson",
+        "retireSupersededLesson",
         "messagesPage",
         "lessonsPage",
         "channelByUsername",

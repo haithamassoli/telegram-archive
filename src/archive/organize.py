@@ -27,7 +27,7 @@ SCAN_PAGE = 400
 
 CLASSIFIER_VERSION = f"classify-v1+{NORM_VERSION}"
 TITLE_PARSER_VERSION = f"title-v1+{NORM_VERSION}"
-GROUPING_VERSION = "group-v1"
+GROUPING_VERSION = "group-v2"
 ORGANIZER_VERSION = "organize-v1"
 
 # Measured, not guessed. Text-only length p50 is 1,217 chars on @alkulife (a
@@ -49,6 +49,13 @@ TITLE_MAX_CHARS = 300
 # as it records them: 82.3% of within-run gaps land in 300-600 s, against a
 # between-run median of 30 hours. 600 s is where those two distributions part.
 PART_GAP_S = 600
+# …but 600 s cut 172 runs in two and left the tail half of each one nameless: a
+# pause in the recording is not a new lesson, and the title is posted once, in
+# front of the first part. So a *bare* part — no caption, no filename, nothing
+# that could name it on its own — keeps joining across a longer pause. The
+# measured tail of those gaps ends at 3.4 hours and the between-run median is
+# 30, so 6 hours sits in empty space between the two.
+RUN_GAP_S = 6 * 3600
 # A recording this long is a whole sitting, not a part of one. @alkulife's parts
 # have a median duration of 319 s; @doros_alkulify's lessons, 2,626 s. Nothing
 # in the archive sits between 20 minutes and a part.
@@ -268,8 +275,19 @@ def filename_title(media: list[dict]) -> str | None:
     return None
 
 
+def bare_part(message: dict) -> bool:
+    """A recording that carries nothing able to name it: caption, filename, both
+    absent. Only such a part may join its run across a long pause — a part that
+    names itself can be a lesson of its own, and @doros_alkulify's re-upload
+    batches are exactly that: N named files under one header post.
+    """
+    return not (message["text"] or "").strip() and (
+        filename_title(audio_media(message)) is None
+    )
+
+
 # --------------------------------------------------------------------------- #
-# Grouping v1
+# Grouping v2
 # --------------------------------------------------------------------------- #
 
 
@@ -286,6 +304,11 @@ def group(messages: list[dict]) -> list[dict]:
     minutes of each other are parts of one. That single test covers @alkulife's
     5-minute voice-note parts, @doros_alkulify's 45-minute lessons, and its
     2017 bulk series uploads, which are N separate lessons behind one index post.
+
+    v2 widens the pause a *bare* part may sit behind (`RUN_GAP_S`, `bare_part`).
+    Nothing else about a lesson's identity moved, so a run that v1 cut in two
+    now composes under the key of its first half and the second half's row is
+    superseded — see `retire_superseded` for what happens to it.
     """
     lessons: list[dict] = []
     by_id = {message["telegramMessageId"]: message for message in messages}
@@ -325,7 +348,8 @@ def group(messages: list[dict]) -> list[dict]:
             short = all(
                 (item["durationMs"] or 0) < WHOLE_LESSON_MS for item in media
             ) and last["shortParts"]
-            if contiguous and short and gap <= PART_GAP_S:
+            limit = RUN_GAP_S if bare_part(message) else PART_GAP_S
+            if contiguous and short and gap <= limit:
                 joined = len(lessons) - 1
 
         if joined is not None:
@@ -474,6 +498,43 @@ def articles_of(messages: list[dict]) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- #
+# Superseded rows
+# --------------------------------------------------------------------------- #
+
+
+def retire_superseded(
+    channels: tuple[str, ...],
+    existing: dict[str, dict],
+    produced: set[str],
+    log=_log,
+) -> tuple[int, int]:
+    """Tombstone the lesson rows this grouping no longer composes. (retired, kept)
+
+    A regrouping does not move a lesson's key, it merges one lesson into another
+    — and the row left behind still lists the audio its neighbour now plays. So
+    it has to go, or the site shows the same recording twice. Only rows belonging
+    to the channels this run scanned in full are considered: a key from a channel
+    nobody looked at is unvisited, not superseded.
+    """
+    prefixes = tuple(f"tg:{username}:" for username in channels)
+    retired = kept = 0
+    for key in sorted(set(existing) - produced):
+        if not key.startswith(prefixes):
+            continue
+        result = convex.mutation(
+            "mutations:retireSupersededLesson",
+            lessonId=existing[key]["id"],
+            reason=f"superseded by {GROUPING_VERSION}",
+        )
+        if result["retired"]:
+            retired += 1
+        else:
+            kept += 1
+            log(f"  superseded but frozen, left for a human: {key}")
+    return retired, kept
+
+
+# --------------------------------------------------------------------------- #
 # The stage
 # --------------------------------------------------------------------------- #
 
@@ -505,7 +566,9 @@ def organize(
             "frozen": 0,
             "needsReview": 0,
             "unchanged": 0,
+            "retired": 0,
         }
+        produced: set[str] = set()
 
         for username in channels:
             channel = convex.query("queries:channelByUsername", username=username)
@@ -564,6 +627,7 @@ def organize(
                     title_message["telegramMessageId"] if title_message else None,
                     first["telegramMessageId"],
                 )
+                produced.add(key)
 
                 parts, offset = [], 0
                 for part in candidate["parts"]:
@@ -700,6 +764,14 @@ def organize(
                 counts.success += 1
                 counts.audio_ms += offset
 
+        # A bounded run saw part of a channel, so most of its keys are missing
+        # for a reason that has nothing to do with grouping.
+        if limit is None:
+            retired, kept = retire_superseded(channels, existing, produced, log)
+            totals["retired"] = retired
+            totals["changed"] += retired
+            log(f"  {retired} superseded row(s) retired, {kept} left frozen")
+
         counts.notes.append(
             f"lessons={totals['lessons']} articles={totals['articles']} "
             f"changed={totals['changed']}"
@@ -708,6 +780,7 @@ def organize(
             f"  {totals['lessons']} lesson(s), {totals['parts']} part(s), "
             f"{totals['articles']} article(s), {totals['changed']} write(s), "
             f"{totals['needsReview']} needing review, {totals['demoted']} demoted, "
+            f"{totals['retired']} retired, "
             f"{totals['unchanged']} unchanged, {totals['frozen']} frozen, "
             f"{totals['deleted']} deleted"
         )
