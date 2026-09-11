@@ -32,3 +32,4 @@ convex/_generated/
 .locks/
 .tmp/
 logs/
+.pastehtml/
