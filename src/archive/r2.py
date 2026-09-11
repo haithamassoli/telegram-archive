@@ -7,9 +7,6 @@ from pathlib import Path
 
 from .config import require_env
 
-ARCHIVE = "archive"
-MEDIA = "media"
-
 
 def client():
     import boto3
@@ -24,9 +21,9 @@ def client():
     )
 
 
-def bucket(which: str = ARCHIVE) -> str:
-    name = "R2_ARCHIVE_BUCKET" if which == ARCHIVE else "R2_MEDIA_BUCKET"
-    return require_env(name)[name]
+def bucket() -> str:
+    """The one bucket. Plan v2.4 dropped merging and with it lessons-media."""
+    return require_env("R2_ARCHIVE_BUCKET")["R2_ARCHIVE_BUCKET"]
 
 
 def head(s3, bucket_name: str, key: str) -> dict | None:

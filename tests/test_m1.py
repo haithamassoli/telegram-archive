@@ -29,6 +29,8 @@ import zstandard
 
 from archive import ingest, pipeline
 
+import backend
+
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -636,8 +638,7 @@ def test_ffprobe_reads_a_real_file():
 
 def test_fake_convex_matches_the_deployed_signatures():
     """The fakes above are only worth something if they mirror the real thing."""
-    source = (REPO / "convex" / "mutations.ts").read_text()
-    source += (REPO / "convex" / "queries.ts").read_text()
+    source = backend.source()
     exported = set(re.findall(r"export const (\w+) = (?:mutation|query)\(", source))
     fake = FakeConvex()
     used = {

@@ -23,6 +23,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from archive import pipeline, transcribe
+
+import backend
 from archive.config import CONFIG_HASH, PINNED_CONFIG
 
 REPO = Path(__file__).resolve().parents[1]
@@ -654,8 +656,7 @@ def test_fake_convex_matches_the_deployed_signatures():
     """The fakes above are only worth something if they mirror the real thing."""
     import inspect
 
-    source = (REPO / "convex" / "mutations.ts").read_text()
-    source += (REPO / "convex" / "queries.ts").read_text()
+    source = backend.source()
     exported = set(re.findall(r"export const (\w+) = (?:mutation|query)\(", source))
     fake = FakeConvex()
     used = {
@@ -689,7 +690,7 @@ def test_fake_convex_matches_the_deployed_signatures():
         assert params <= declared, f"{name}: fake takes {params - declared}"
 
     # Every field M2 writes has to exist in the schema, or the mutation throws.
-    schema = (REPO / "convex" / "schema.ts").read_text()
+    schema = backend.schema()
     table = re.search(r"partTranscripts: defineTable\(\{(.*?)\n  \}\)", schema, re.S)
     fields = set(re.findall(r"(\w+): v\.", table.group(1)))
     assert {"rawR2Key", "durationMs", "segmentCount", "model", "modelRevision"} <= fields

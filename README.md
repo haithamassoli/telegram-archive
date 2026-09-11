@@ -1,14 +1,13 @@
 # Telegram Knowledge Archive
 
-Implementation of `docs/telegram_archive_plan.md` (v2.3, FROZEN).
+Implementation of `docs/telegram_archive_plan.md` (v2.4, FROZEN).
 Milestones and their exit criteria live in `docs/tasks.md`.
 
 ## Layout
 
 ```
 src/archive/        pipeline code (M0: pinned config, gates, legacy export)
-convex/             schema (§2) + the four atomic uniqueness mutations
-m0.gates.json       recorded M0 decisions: configHash, codec, GPU benchmark
+m0.gates.json       recorded M0 decisions: configHash, playback gate, GPU benchmark
 tests/test_m0.py    `python tests/test_m0.py` — no framework needed
 cohere-transcribe/  vendored ASR package (M2)
 ```
@@ -17,7 +16,7 @@ cohere-transcribe/  vendored ASR package (M2)
 
 ```sh
 uv sync                       # python deps
-npm install                   # convex + typescript
+npm install                   # the convex CLI, for `export` / `data` only
 cp .env.example .env          # then fill in the real values
 npx convex dev                # writes .env.local, deploys the schema
 ```
@@ -112,14 +111,22 @@ in R2 and Convex. **Changing any of them re-transcribes the whole archive.**
 
 ## Convex
 
-Deployed to the `alkulify` project's dev deployment.
+The `alkulify` deployment is shared with the site repo, `../kashaf-alkulify`,
+and **that repo owns the schema and functions** — they live in its `convex/`
+directory alongside the site's own `books` table and auth. This repo holds no
+Convex source and talks to the deployment over HTTP from
+`src/archive/convex.py`, which needs `CONVEX_URL` and nothing else.
+
+**Never run `npx convex dev` from here.** A push replaces the deployment's
+whole function set and schema, so pushing a second `convex/` directory at the
+same deployment deletes the other one's backend. `.env.local` deliberately
+carries no `CONVEX_DEPLOYMENT` so the CLI cannot target it by accident.
 
 ```sh
-npx convex dev      # generates convex/_generated, deploys schema + mutations
-npm run typecheck   # tsc over convex/
-npx convex dashboard
+npx convex dashboard --url "$CONVEX_URL"   # read-only poking
 ```
 
 Convex indexes are not `UNIQUE` constraints. Uniqueness on `sha256`,
 `(sha256, configHash)`, `lessonKey` and `stage` is enforced only by the atomic
-mutations in `convex/mutations.ts` — always write through those.
+mutations in `../kashaf-alkulify/convex/mutations.ts` — always write through
+those.

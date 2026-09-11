@@ -2,11 +2,7 @@
   "name": "telegram-archive",
   "private": true,
   "type": "module",
-  "scripts": {
-    "typecheck": "tsc --noEmit -p convex"
-  },
   "dependencies": {
-    "convex": "^1.45.0",
-    "typescript": "^7.0.2"
+    "convex": "^1.45.0"
   }
 }

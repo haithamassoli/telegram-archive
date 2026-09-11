@@ -1,6 +1,6 @@
-# Telegram Knowledge Archive — Implementation Plan v2.3 (FROZEN)
+# Telegram Knowledge Archive — Implementation Plan v2.4 (FROZEN)
 
-**Status: FROZEN implementation baseline.** Supersedes v2 / v2.1 / both review docs; standalone. The next architecture change requires a concrete implementation blocker discovered in real data — not another review round. v2.3 (2026-09-05) fills declared-but-thin sections and closes gaps found while operating M1/M2 — no architecture change; log in §11.
+**Status: FROZEN implementation baseline.** Supersedes v2 / v2.1 / v2.3 / both review docs; standalone. The next architecture change requires a concrete implementation blocker discovered in real data — not another review round. v2.3 (2026-09-05) filled declared-but-thin sections and closed gaps found while operating M1/M2. v2.4 (2026-09-11) **removes** audio merging: a lesson stays a list of parts and the player concatenates them on a virtual timeline. Scope removal, not addition; log in §11.
 **Stack:** Python + Telethon · Convex · Cloudflare R2 · cohere-transcribe · Meilisearch · FFmpeg/ffprobe.
 
 ---
@@ -29,12 +29,11 @@ lesson identity               = lessonKey        (deterministic from source;
                                                   R2 keys and Meilisearch chunk IDs)
 lesson composition identity   = assemblyHash     (ordered part sha256s)
 lesson transcript identity    = assemblyHash + configHash
-merged audio identity         = mergedSha256     (of the produced file)
 search chunk identity         = lessonId + assemblyHash + seq
 embedding identity            = embedHash        (pinned embed config; Phase 4.5)
 ```
 
-Staleness is checked by identity, not flags: a lesson-transcript artifact is current iff its key embeds the lesson's **current** `assemblyHash` and the **active** `configHash`. Same pattern for chunks and merged audio.
+Staleness is checked by identity, not flags: a lesson-transcript artifact is current iff its key embeds the lesson's **current** `assemblyHash` and the **active** `configHash`. Same pattern for chunks.
 
 ---
 
@@ -87,14 +86,12 @@ lessons
   titleParserVersion, titleParseConfidence
   groupingVersion, groupingConfidence
   reviewStatus: auto | needs_review | approved        -- §0 amendment 1 governs
-  mergeStatus:  pending | processing | done | failed
-  mergedR2Key?, mergedSha256?
   lessonTranscriptR2Key?
   indexedAt?, indexVersion?
   titleMessageId?, firstTelegramMessageId?, lastTelegramMessageId?
   partCount, durationMs
 
-lessonParts
+lessonParts                       -- the playback timeline; see §5
   lessonId, messageId, mediaObjectId, order, durationMs, offsetMs
   idx: by_lesson_order, by_message
 
@@ -137,10 +134,11 @@ telegram-archive/                         (private, permanent)
   backups/convex/{yyyy-mm-dd}.zip         (weekly `npx convex export` — §6 Phase 6;
                                            the only non-reproducible data is human
                                            decisions living in Convex)
-
-lessons-media/                            (public via custom domain)
-  lessons/{lessonId}/{mergedSha256}.{m4a|opus}    (codec per Phase-0 gate)
 ```
+
+**One bucket.** There is no public media bucket: parts are served from the private archive
+bucket through short-lived signed URLs (§5). `lessons-media` and its custom domain were
+dropped in v2.4 along with merging.
 
 ---
 
@@ -149,19 +147,33 @@ lessons-media/                            (public via custom domain)
 1. **Write-order law:** artifact to R2 first, Convex `done` second — every stage.
 2. **Skip rule (fast path):** skip iff the authoritative Convex record is `done`.
 3. **Crash-window recovery (slow path):** for `pending` / stale-`processing` / `failed` / missing records only — compute the deterministic expected key, `HEAD` it; exists + basic validation → promote Convex to `done` and skip; absent → process. (`existing="skip"` stays on as a same-machine belt.) The worker knows `inputSha256`, `configHash`, and `expectedR2Key` **before** inference starts.
-4. **`reconcile-artifacts` command:** A) Convex `done` + R2 missing → flag + mark for reprocessing; B) R2 exists + Convex not `done` → validate + repair Convex; C) R2 orphan with no Convex reference → report only; never auto-delete archival objects. Reused for part transcripts, lesson transcripts, merged audio.
+4. **`reconcile-artifacts` command:** A) Convex `done` + R2 missing → flag + mark for reprocessing; B) R2 exists + Convex not `done` → validate + repair Convex; C) R2 orphan with no Convex reference → report only; never auto-delete archival objects. Reused for part transcripts and lesson transcripts.
 5. **Stage locks:** every batch command takes a local `flock` **and** `acquirePipelineStage` (free, or heartbeat stale > 5 min); heartbeat 60 s; on exit release lock and append a `pipelineRuns` row with counts. Per-record claims remain out of scope until ≥2 concurrent workers exist for one stage.
 6. **Failures first:** each run drains unresolved `failures` for its stage before new work; attempts capped, then ops page.
 7. **Override precedence:** per §0 amendment 1 — reruns never touch `approved` compositions; source-message changes demote to `needs_review`.
 8. **Full re-runs stay legal** for Organizer (subject to rule 7), Lesson Transcript Builder, Chunk Builder, reindex.
 
-**Reprocessing map:** grouping change → new `assemblyHash` → regen lesson transcript + chunks + merge; transcription config change → new `configHash` → new part transcripts → downstream; normalization/chunk/index change (`normVersion`) → rebuild search documents only; embed config change → new `embedHash` → re-embed + vector update only; nothing downstream ever requires re-downloading Telegram.
+**Reprocessing map:** grouping change → new `assemblyHash` → recompute `lessonParts.order`/`offsetMs` → regen lesson transcript + chunks; transcription config change → new `configHash` → new part transcripts → downstream; normalization/chunk/index change (`normVersion`) → rebuild search documents only; embed config change → new `embedHash` → re-embed + vector update only; nothing downstream ever requires re-downloading Telegram.
 
 ---
 
-## 5. Timestamps, Chunks, Playback (unchanged from v2.1)
+## 5. Timestamps, Chunks, Playback
 
-`lessonStartMs = part.offsetMs + segment.startMs`; offsets = cumulative ffprobe durations captured at ingest (Telegram's own durations are whole-second and unusable for ms offsets). Chunks 45–90 s, deterministic IDs, always joining part-N tails with part-N+1 heads. Player seeks `max(0, startMs − 2000)`. Merged retranscription per lesson stays a cheap optional exception.
+`lessonStartMs = part.offsetMs + segment.startMs`; offsets = cumulative ffprobe durations captured at ingest (Telegram's own durations are whole-second and unusable for ms offsets). Chunks 45–90 s, deterministic IDs, always joining part-N tails with part-N+1 heads. Player seeks `max(0, startMs − 2000)`.
+
+**The lesson timeline is virtual (v2.4).** There is no merged file. `lessons.durationMs` is Σ part durations and `lessonParts.offsetMs` is the running total, so the timeline every chunk is already stamped against *is* the concatenation — nothing has to be re-attributed, and the "Σ parts vs merged file" drift class does not exist.
+
+Playback contract:
+- Locate `t` → the part where `offsetMs ≤ t < offsetMs + durationMs`; play it at `(t − offsetMs) / 1000`.
+- One `<audio>` element, `src` swapped on `ended`. If the boundary gap is audible, add a second element and unlock it inside the first user gesture (`play()` then immediate `pause()`) — iOS Safari blocks programmatic playback on an element no gesture has touched.
+- Prefetch the next part when ~30 s remain, never the whole lesson: a ten-part lesson would otherwise burn a mobile reader's data on open.
+- `navigator.mediaSession.setPositionState()` gets the *lesson* duration and position. Without it the lock screen shows part boundaries — exactly what this design hides.
+- Parts are served from the private bucket via short-lived signed URLs, refreshed on 403. This is a permanent production path, not an interim (see §9).
+- Part boundaries are rendered in the review UI (§6) and hidden in the public player. Same component, one prop.
+
+**Known ceiling:** the virtual timeline trusts stored ffprobe durations. A part whose real decoded length differs (VBR without a Xing header) drifts the *displayed* position by that delta; playback self-corrects at each `ended`. Sub-second, and caught at ingest if it matters.
+
+**No single-file download.** A lesson has no one shareable/downloadable object, and a podcast RSS feed would have nothing to point at. If either is ever wanted, concatenate on demand for that one lesson — the ffmpeg call was never the hard part; the lifecycle and reconciliation were, and they are what v2.4 deletes.
 
 ---
 
@@ -172,7 +184,7 @@ lessons-media/                            (public via custom domain)
 - HF model terms + `HF_TOKEN`/`HF_HOME`; `cohere-transcribe-doctor --model-access`.
 - **Pin transcription config** (model, resolved modelRevision commit, language=ar, vad, vadMerge, alignment) → canonical-JSON → `configHash` computed and logged before any inference.
 - **Benchmark the actual GPU** (RTF, files/batch, VRAM) → real archive runtime; schedule from measurement.
-- **Codec gate:** Opus vs AAC seek/Range on iOS Safari, Android, desktop; record decision.
+- **Playback gate (v2.4):** the source files ship as-is — nothing is re-encoded — so this is no longer "Opus vs AAC" but "do the archive's own containers seek and honour Range on iOS Safari, Android, desktop?" Test the real extensions present in `mediaObjects.ext`; record decision + `testedOn`.
 - **Legacy export first:** assoli-v1 → `legacy/assoli-v1/` (transcripts, human corrections, query logs, YT↔TG map). v1 stays live and untouched.
 - Provision Convex, R2 buckets + scoped keys, Meilisearch keys; repo skeleton; atomic uniqueness mutations from day one.
 
@@ -227,17 +239,19 @@ lessons-media/                            (public via custom domain)
 - **Query side:** a small embed service (ONNX int8, CPU) beside Meilisearch on the VPS embeds the query; client calls hybrid search with `semanticRatio` starting at 0.3–0.5, tuned by replay in Phase 7.
 - **Sizing:** ~150–200k chunk docs → ~0.6–0.8 GB raw vectors + ANN overhead; the VPS needs ~4 GB RAM, or enable Meilisearch binary quantization.
 
-### Phase 5 — Merged playback
-- concat-demuxer fast path / re-encode fallback to gated codec; merged sha256 → public bucket; Σ durations ≈ merged (warn > 500 ms); `mergeStatus` lifecycle.
-- Player: seek −2 s, `?t=` links, autoplay handling. Chunk re-attribution = pure reindex.
+### Phase 5 — Continuous multi-part playback
+- Player over the §5 virtual timeline: locate-part, seek −2 s, `?t=` deep links, gapless-enough boundary, prefetch-next, Media Session position, autoplay handling.
+- Signed-URL endpoint hardened for production: rate limit, 403 refresh, Range verified.
+- Verified on the Phase-0 device matrix: seek across a boundary, resume mid-part, lock screen shows lesson duration.
+- Chunks need no change at all — they were stamped against this timeline from Phase 4.
 
 ### Phase 6 — Review & continuous sync
-- Review UI: needs_review queue by confidence; preview/reorder/add/remove/split/merge/rename; approve → new `assemblyHash` → regen transcript + remerge + reindex (lesson-scoped).
+- Review UI: needs_review queue by confidence; preview/reorder/add/remove/split/merge/rename; approve → recompute `order`/`offsetMs` → new `assemblyHash` → regen transcript + reindex (lesson-scoped).
 - Incremental sync on a normal session (no takeout — that privilege is for the historical bulk pull only): > `lastMessageId` + ~300-message recheck (edits/`deletedAt`); affected approved lessons demote to `needs_review` (§4.7), never recompose.
 - **Timers under §4.5 locks — the whole automation story.** No bot, no daemon, no framework: each cadence is one dumb wrapper script chaining the existing idempotent commands, fired by the OS scheduler. Every command self-locks and skips `done` work, so blind scheduling is the design, not a compromise.
   ```text
   every 15 min   sync → transcribe-pending → organize → index-pending
-  nightly        merge (+ Phase-4.5 embed batch, if adopted)
+  nightly        Phase-4.5 embed batch, if adopted (otherwise nothing)
   weekly         reconcile-artifacts · `npx convex export` → backups/convex/
   ```
 - **Placement (closes Open Item 1):** the GPU host is the M-series Mac. Until cutover, all timers run there as launchd LaunchAgents (macOS has no systemd). At cutover they move as systemd timers to the VPS that hosts Meilisearch and the site anyway. Transcription then either stays on the Mac or runs on the VPS CPU — transcript identity is the pinned config, not the device, so both are legal; and the §4.5 stage locks already arbitrate two machines, so splitting stages across VPS + Mac needs no new code. The session file moves to the VPS as a secret with the same care as `.env`.
@@ -246,7 +260,7 @@ lessons-media/                            (public via custom domain)
 
 ### Phase 7 — Hardening & relevance
 - Ops page: stage counts, `failures`, `pipelineLocks` state, `pipelineRuns` history (last run, duration, counts), per-channel sync.
-- `reconcile-artifacts` scheduled weekly; retry wrappers; temp cleanup; signed-URL endpoint rate-limited; least-privilege keys; search-only Meili key client-side.
+- `reconcile-artifacts` scheduled weekly; retry wrappers; temp cleanup; least-privilege keys; search-only Meili key client-side. (Signed-URL rate limiting moved up to Phase 5 — v2.4 makes that endpoint the only way audio reaches a listener.)
 - Relevance from real v1 query logs: hamza/diacritics variants (via `normVersion`), Arabic typo tolerance, chunk duration, title weight, `distinctAttribute` revisit, hybrid `semanticRatio` (if Phase 4.5 was adopted); then decide if raw `text` joins searchable.
 - Recovery drills incl. the §4.3 crash window; reindex-from-scratch proven; Convex snapshot restore walked through once.
 
@@ -275,11 +289,13 @@ The remaining uncertainty — title-format drift across eras, grouping accuracy,
 | Telegram limits/ban | Dedicated account, takeout, pacing, resumable checkpoints |
 | GPU slower than reference | Phase-0 benchmark sets schedule; architecture speed-independent |
 | Organizer rerun vs manual edits | §0 amendment 1 / §4.7 precedence rule |
-| Part-boundary truncation | Cross-part chunk joining; optional merged retranscription |
+| Part-boundary truncation | Cross-part chunk joining (§5) |
 | Approximate timestamps | Seek −2 s; excerpt shown |
 | Title/grouping drift across eras | Versioned parser + grouping; confidence; review queue; legal full reruns |
-| iOS codec | Phase-0 gate |
-| Signed-URL expiry mid-listen | Short parts + refresh on 403 |
+| iOS codec / Range on source containers | Phase-0 playback gate |
+| Audible gap at a part boundary | Prefetch-next; second unlocked `<audio>` element if measured gap is audible (§5) |
+| Displayed position drifts from real audio | Stored ffprobe durations; self-corrects at each `ended` (§5) |
+| Signed-URL expiry mid-listen | Short parts + refresh on 403; endpoint rate-limited in Phase 5 |
 | Losing v1 assets | §8 export + coverage diff gate deletion |
 | **Planning loop** | This document is frozen; the next artifact is running code |
 
@@ -303,3 +319,35 @@ Spec completion, not architecture change — every item below either details a s
 3. **Phase 4 search spec filled in:** deployment + key handling, the `normVersion` normalization contract (one function for index, query, and replay), concrete document shapes with `assemblyHash`-embedding chunk ids, and initial index settings including synonyms seeded from the v1 `domain-synonyms.json`.
 4. **Phase 4.5 added — hybrid semantic search with bge-m3, explicitly gated** on the §8.4 keyword-replay showing recall gaps that normalization + synonyms cannot close. Embeddings get the same identity discipline as transcripts (`embedHash`), added to §1 and the §4 reprocessing map.
 5. **Open Item 4 added:** the 94-video / 6.2 h scope decision the M2 scan surfaced, due before Phase 3.
+
+---
+
+## 12. v2.4 Amendment Log (2026-09-11) — merging removed
+
+An owner decision, and a **scope removal**: the plan gets smaller, no new architecture enters. Phase 5 built one continuous file per lesson; it is replaced by a player that concatenates the parts a lesson already has. The freeze holds — nothing below adds a moving part.
+
+**Why it is not merely neutral.** Merging did not only buy a single file, it bought a class of failure modes with it: the Σ-part-durations vs merged-file drift check (the 500 ms warning), a re-encode fallback whenever parts disagreed on codec, and a re-merge after every approval. With a virtual timeline that whole class is gone by construction — the timeline *is* Σ ffprobe durations, which is the number chunks were already stamped against. Heterogeneous part codecs also stop being a problem, since each file decodes on its own.
+
+**Removed:**
+
+1. Merge worker: concat-demuxer fast path, re-encode fallback, `mergeStatus` lifecycle, the >500 ms duration warning.
+2. `lessons.mergeStatus` / `mergedR2Key` / `mergedSha256` (§2), and `mergedSha256` from the §1 identity hierarchy.
+3. The `lessons-media` public bucket, its custom domain, and the M0 key split that existed to serve it (§3).
+4. `reconcile-artifacts` coverage of merged audio (§4.4); the `+ merge` leg of the reprocessing map.
+5. The nightly `merge` timer (Phase 6) and the remerge step in the approve flow.
+6. "Chunk re-attribution to the merged timeline" — there is no second timeline to re-attribute to.
+7. "Optional merged retranscription" as a part-boundary mitigation (§9); cross-part chunk joining already covers it.
+
+**Added, in exchange:**
+
+1. The §5 playback contract: locate-part, single `<audio>` with `src` swap, iOS gesture-unlock for a second element if needed, prefetch-next at ~30 s, Media Session position on the lesson duration, boundaries shown to reviewers and hidden from readers. Roughly 80 lines over the v1 player.
+2. Phase 5 re-purposed to that player plus hardening the signed-URL endpoint, which v2.4 promotes from an interim convenience to the only path audio takes to a listener. Rate limiting moves from Phase 7 to Phase 5.
+3. Reorder in the review UI now recomputes three things in order: `lessonParts.order`, then `offsetMs` cumulatively, then `assemblyHash` — the last invalidating the lesson transcript and its chunks, exactly as a grouping change always did.
+
+**Accepted costs, named:**
+
+1. **No single downloadable or externally shareable object per lesson**, and no podcast RSS feed without one. Remedy if ever wanted: concatenate on demand for that one lesson.
+2. **The signed-URL endpoint is now load-bearing.** R2 egress is free so the bill does not move, but an outage there is now an outage of playback.
+3. **A part boundary is a seam.** It is engineered down to inaudible, not to zero.
+
+**Phase numbering is unchanged** — Phase 5 keeps its slot, so every "after Phase 5" reference (notably the §8.5 parity cutover) still reads correctly.
