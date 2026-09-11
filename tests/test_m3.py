@@ -47,6 +47,7 @@ class FakeConvex:
         self.locks: dict[str, dict] = {}
         self.runs: list[dict] = []
         self.writes = 0  # every mutation that reported a change
+        self.calls: list[str] = []  # every mutation attempted, changed or not
 
     # -- transport ---------------------------------------------------------- #
 
@@ -54,7 +55,9 @@ class FakeConvex:
         return getattr(self, f"q_{path.split(':')[1]}")(**kw)
 
     def mutation(self, path, **kw):
-        return getattr(self, f"m_{path.split(':')[1]}")(**kw)
+        name = path.split(":")[1]
+        self.calls.append(name)
+        return getattr(self, f"m_{name}")(**kw)
 
     # -- queries ------------------------------------------------------------ #
 
@@ -80,9 +83,13 @@ class FakeConvex:
             for media in message["media"]
         }
         for row in rows:
+            if row.get("deletedAt") is not None:
+                continue
             parts = sorted(self.parts.get(row["id"], []), key=lambda p: p["order"])
             out.append(
                 {
+                    "partsLocked": row.get("partsLocked", False),
+                    "titleLocked": row.get("titleLocked", False),
                     **row,
                     "parts": [
                         {**p, "sha256": sha[p["mediaObjectId"]]} for p in parts
@@ -128,12 +135,35 @@ class FakeConvex:
             self.lessons.append(row)
             self.writes += 1
             return {"id": row["id"], "created": True, "skipped": False}
-        if existing["reviewStatus"] == "approved":
+        if (
+            existing["reviewStatus"] == "approved"
+            or existing.get("deletedAt") is not None
+            or existing.get("partsLocked")
+        ):
             return {"id": existing["id"], "created": False, "skipped": True}
+        if existing.get("titleLocked"):
+            rest = {
+                k: v
+                for k, v in rest.items()
+                if k
+                not in (
+                    "rawTitle",
+                    "normalizedTitle",
+                    "seriesName",
+                    "normalizedSeriesName",
+                    "seriesEpisode",
+                    "lessonPartLabel",
+                    "titleParseConfidence",
+                    "titleParserVersion",
+                )
+            }
         existing.update(rest)
         return {"id": existing["id"], "created": False, "skipped": False}
 
     def m_replaceLessonParts(self, lessonId, parts):
+        row = next(r for r in self.lessons if r["id"] == lessonId)
+        if row.get("deletedAt") is not None or row.get("partsLocked"):
+            return {"changed": False, "count": 0}
         before = self.parts.get(lessonId, [])
         if before == parts:
             return {"changed": False, "count": len(before)}
@@ -142,6 +172,9 @@ class FakeConvex:
         return {"changed": True, "count": len(parts)}
 
     def m_replaceLessonSources(self, lessonId, sources):
+        row = next(r for r in self.lessons if r["id"] == lessonId)
+        if row.get("deletedAt") is not None:
+            return {"changed": False, "count": 0}
         before = self.sources.get(lessonId, [])
         if before == sources:
             return {"changed": False, "count": len(before)}
@@ -242,6 +275,10 @@ class World:
                     "ext": "mp3",
                     "mimeType": "audio/mpeg",
                     "durationMs": duration,
+                    # `queries:messagesPage` flags a deleted binary rather than
+                    # hiding it, so grouping still sees the message that carried
+                    # it and the lesson keeps its key.
+                    "deletedAt": None,
                 }
             )
         row = {
@@ -515,15 +552,136 @@ def test_a_truncated_article_is_stitched_back_to_its_continuation():
 
 
 def test_a_second_run_over_unchanged_data_writes_nothing():
-    """M3's exit criterion, measured rather than asserted."""
+    """M3's exit criterion, measured rather than asserted.
+
+    The rerun does not merely write nothing — it does not *ask*. A lesson whose
+    composition, title and stamped versions all match is skipped before any
+    mutation is sent, which is what keeps a channel that gained one message from
+    costing one round trip per lesson already in the archive.
+    """
     world = lesson_world()
     first = world.run(organize.organize, channels=("alkulife",))
     assert first["lessons"] == 2 and first["changed"] > 0
-    before = world.convex.writes
+    before, calls = world.convex.writes, len(world.convex.calls)
     second = world.run(organize.organize, channels=("alkulife",))
     assert second["changed"] == 0, f"rerun wrote {second['changed']} time(s)"
     assert world.convex.writes == before, "and touched nothing underneath either"
-    assert second["lessons"] == first["lessons"]
+    assert second["unchanged"] == 2 and second["lessons"] == 0
+    assert "upsertLessonByKey" not in world.convex.calls[calls:], (
+        "a no-op rerun still spent a round trip per lesson"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# what the dashboard deletes stays deleted
+#
+# Every one of these runs the Organizer twice: once to build the archive, then
+# again after a hand edit, because the whole question is what the *second* run
+# does. The dashboard's mutations live in the site repo; what is asserted here is
+# the contract this side of the wire depends on.
+# --------------------------------------------------------------------------- #
+
+
+def _delete_media(world, sha):
+    """What `admin.deletePartRows` leaves behind: a flagged binary, no part."""
+    for message in world.convex.messages:
+        for media in message["media"]:
+            if media["sha256"] == sha:
+                media["deletedAt"] = 1_700_000_000_000
+    for lesson_id, parts in world.convex.parts.items():
+        kept = [p for p in parts if p["mediaObjectId"] != f"media-{sha}"]
+        if len(kept) != len(parts):
+            world.convex.parts[lesson_id] = kept
+            row = next(r for r in world.convex.lessons if r["id"] == lesson_id)
+            row["partsLocked"] = True
+
+
+def test_a_deleted_audio_is_not_grouped_back_into_its_lesson():
+    world = lesson_world()
+    world.run(organize.organize, channels=("alkulife",))
+    lesson = world.convex.lessons[0]
+    key, parts = lesson["lessonKey"], world.convex.parts[lesson["id"]]
+    assert len(parts) == 3
+
+    _delete_media(world, "b" * 64)
+    result = world.run(organize.organize, channels=("alkulife",))
+
+    assert result["frozen"] >= 1
+    assert [p["mediaObjectId"] for p in world.convex.parts[lesson["id"]]] == [
+        "media-" + "a" * 64,
+        "media-" + "c" * 64,
+    ], "the deleted binary came back"
+    assert lesson["lessonKey"] == key, "and the lesson kept its identity"
+
+
+def test_deleting_the_first_audio_does_not_split_the_lesson_in_two():
+    """The regression that makes `live_media` exist.
+
+    `lesson_key` is derived from the first message carrying audio. Hiding a
+    deleted binary from the grouper would move that message along by one and
+    compose a second lesson over the parts the admin just kept.
+    """
+    world = lesson_world()
+    world.run(organize.organize, channels=("alkulife",))
+    before = {r["lessonKey"] for r in world.convex.lessons}
+
+    _delete_media(world, "a" * 64)
+    world.run(organize.organize, channels=("alkulife",))
+
+    assert {r["lessonKey"] for r in world.convex.lessons} == before
+
+
+def test_a_deleted_lesson_is_never_composed_again():
+    world = lesson_world()
+    world.run(organize.organize, channels=("alkulife",))
+    lesson = world.convex.lessons[0]
+    # What `admin.deleteLessonRows` leaves: parts gone, the row kept as the
+    # tombstone that `lessonKey` is looked up in.
+    lesson["deletedAt"] = 1_700_000_000_000
+    world.convex.parts[lesson["id"]] = []
+    for sha in ("a", "b", "c"):
+        _delete_media(world, sha * 64)
+
+    result = world.run(organize.organize, channels=("alkulife",))
+
+    assert result["deleted"] == 1
+    assert world.convex.parts[lesson["id"]] == [], "the lesson was recomposed"
+    live = [r for r in world.convex.lessons if r.get("deletedAt") is None]
+    assert len(live) == 1
+
+
+def test_a_renamed_lesson_keeps_its_title_through_a_rerun():
+    world = lesson_world()
+    world.run(organize.organize, channels=("alkulife",))
+    lesson = world.convex.lessons[0]
+    lesson.update(
+        {"rawTitle": "عنوان كتبه المشرف", "titleLocked": True, "seriesEpisode": 7}
+    )
+
+    world.run(organize.organize, channels=("alkulife",))
+
+    assert lesson["rawTitle"] == "عنوان كتبه المشرف"
+    assert lesson["seriesEpisode"] == 7
+    assert lesson["groupingVersion"] == organize.GROUPING_VERSION, (
+        "a locked title must not freeze the rest of the row"
+    )
+
+
+def test_a_lesson_whose_parts_were_moved_by_hand_is_left_alone():
+    world = lesson_world()
+    world.run(organize.organize, channels=("alkulife",))
+    lesson = world.convex.lessons[0]
+    # `admin.movePart` carried the third part over to the other lesson.
+    moved = world.convex.parts[lesson["id"]].pop()
+    lesson["partsLocked"] = True
+    other = world.convex.lessons[1]
+    world.convex.parts[other["id"]].append({**moved, "order": 1, "offsetMs": 0})
+    other["partsLocked"] = True
+    composition = {k: list(v) for k, v in world.convex.parts.items()}
+
+    world.run(organize.organize, channels=("alkulife",))
+
+    assert world.convex.parts == composition, "a rerun undid a hand edit"
 
 
 def test_an_approved_lesson_is_never_recomposed():
@@ -557,6 +715,7 @@ def test_an_approved_lesson_whose_parts_changed_is_handed_back_to_a_human():
                     "ext": "mp3",
                     "mimeType": "audio/mpeg",
                     "durationMs": 300_000,
+                    "deletedAt": None,
                 }
             ],
         },

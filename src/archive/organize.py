@@ -138,8 +138,19 @@ def audio_media(message: dict) -> list[dict]:
     archive arrive without a `DocumentAttributeAudio` attribute and are typed
     `document`. The mime/extension test is the one M2 counted its own corpus
     with, so lessons and transcripts agree on what audio is.
+
+    Binaries an admin deleted are still counted here, on purpose. Grouping and
+    `lesson_key` are derived from *which messages carry audio*, so forgetting a
+    deleted file would slide a lesson's identity onto the next message and
+    compose a duplicate next to the one the admin just edited. `live_media` is
+    what a composition is actually built from.
     """
     return [media for media in message["media"] if transcribe.is_audio(media)]
+
+
+def live_media(message: dict) -> list[dict]:
+    """`audio_media` minus what an admin deleted — the parts a lesson gets."""
+    return [media for media in audio_media(message) if media["deletedAt"] is None]
 
 
 # --------------------------------------------------------------------------- #
@@ -490,8 +501,10 @@ def organize(
             "parts": 0,
             "changed": 0,
             "demoted": 0,
+            "deleted": 0,
             "frozen": 0,
             "needsReview": 0,
+            "unchanged": 0,
         }
 
         for username in channels:
@@ -554,7 +567,7 @@ def organize(
 
                 parts, offset = [], 0
                 for part in candidate["parts"]:
-                    for media in audio_media(part):
+                    for media in live_media(part):
                         duration = media["durationMs"] or 0
                         parts.append(
                             {
@@ -569,10 +582,27 @@ def organize(
                         offset += duration
                 digest = assembly_hash([part["sha256"] for part in parts])
 
+                previous = existing.get(key)
+
+                # Every binary under this lesson was deleted by an admin. There
+                # is no lesson left to write, and the deleted row it may still
+                # have is its own tombstone.
+                if not parts:
+                    totals["deleted"] += 1
+                    counts.skipped += 1
+                    continue
+
+                # A hand-edited composition outranks a rerun (`partsLocked`).
+                # `upsertLessonByKey` enforces it either way; skipping here just
+                # spares three round trips per edited lesson.
+                if previous is not None and previous["partsLocked"]:
+                    totals["frozen"] += 1
+                    counts.skipped += 1
+                    continue
+
                 # §4.7. An approved lesson is frozen — but a composition that no
                 # longer matches, or a source message deleted underneath it, is
                 # handed back to a human rather than kept or overwritten.
-                previous = existing.get(key)
                 if previous is not None and previous["reviewStatus"] == "approved":
                     deleted = any(
                         part["deletedAt"] is not None for part in candidate["parts"]
@@ -588,6 +618,23 @@ def organize(
                         log(f"  demoted {key}")
                     else:
                         totals["frozen"] += 1
+                    counts.skipped += 1
+                    continue
+
+                # The no-op fast path. A rerun over a channel whose old messages
+                # have not moved should cost reads and nothing else — this is
+                # what keeps the Organizer from rewriting 5.6k unchanged lessons
+                # every time the channel posts one new one. Sources are not
+                # compared: they are derived from the same title/first-part
+                # messages the assembly hash and title already pin down.
+                if (
+                    previous is not None
+                    and previous["assemblyHash"] == digest
+                    and previous["groupingVersion"] == GROUPING_VERSION
+                    and previous["titleParserVersion"] == TITLE_PARSER_VERSION
+                    and (previous["titleLocked"] or previous["rawTitle"] == title_text)
+                ):
+                    totals["unchanged"] += 1
                     counts.skipped += 1
                     continue
 
@@ -626,6 +673,12 @@ def organize(
                     partCount=len(parts),
                     durationMs=offset,
                 )
+                # A deleted lesson comes back `skipped`: its row survives only
+                # as a tombstone, and writing parts under it would resurrect it.
+                if lesson["skipped"]:
+                    totals["frozen"] += 1
+                    counts.skipped += 1
+                    continue
                 written = convex.mutation(
                     "mutations:replaceLessonParts",
                     lessonId=lesson["id"],
@@ -654,7 +707,9 @@ def organize(
         log(
             f"  {totals['lessons']} lesson(s), {totals['parts']} part(s), "
             f"{totals['articles']} article(s), {totals['changed']} write(s), "
-            f"{totals['needsReview']} needing review, {totals['demoted']} demoted"
+            f"{totals['needsReview']} needing review, {totals['demoted']} demoted, "
+            f"{totals['unchanged']} unchanged, {totals['frozen']} frozen, "
+            f"{totals['deleted']} deleted"
         )
         return totals
 
