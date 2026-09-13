@@ -27,7 +27,7 @@ SCAN_PAGE = 400
 
 CLASSIFIER_VERSION = f"classify-v1+{NORM_VERSION}"
 TITLE_PARSER_VERSION = f"title-v1+{NORM_VERSION}"
-GROUPING_VERSION = "group-v2"
+GROUPING_VERSION = "group-v3"
 ORGANIZER_VERSION = "organize-v1"
 
 # Measured, not guessed. Text-only length p50 is 1,217 chars on @alkulife (a
@@ -60,6 +60,11 @@ RUN_GAP_S = 6 * 3600
 # have a median duration of 319 s; @doros_alkulify's lessons, 2,626 s. Nothing
 # in the archive sits between 20 minutes and a part.
 WHOLE_LESSON_MS = 20 * 60 * 1000
+# A series header opens a run: one post names a book, the messages behind it are
+# that book, one file per lesson. Two files is what makes it a series rather than
+# a title — and 2017's runs match their own declared counts exactly, so a
+# declared count of two is accepted where the files themselves were deleted.
+SERIES_RUN_MIN = 2
 
 URL = re.compile(r"https?://\S+")
 # Announcements, live-stream state, channel promotion, postponements. Every one
@@ -98,6 +103,28 @@ _DIGITS = str.maketrans(
 )
 # Telegram sanitises filenames and wraps them in RTL isolates.
 _FILENAME_JUNK = str.maketrans({"‎": "", "⁨": "", "⁩": "", "_": " "})
+
+# A bulk-series header: «شرح كتاب [ الصمت ] ... ( عدد الدروس : 11 ) 👇», then the
+# whole book as eleven consecutive files. @doros_alkulify opened in 2017 by
+# uploading its back catalogue this way, and 22 of its 38 declared counts match
+# the run behind them file for file. The files are named 01.MP3, 02.MP3, so the
+# series name exists nowhere except the header.
+SERIES_COUNT = re.compile(r"عدد\s+الدروس\s*:?\s*(\d{1,4})?")
+# The book's name, in brackets. Two brackets are not names and both appear here:
+# one holding only a number is an episode («تعليق على الجامع [ ١٧٣ ]»), one
+# holding the count is the header's own footnote («[ مكتمل - عدد الدروس 4 ]»).
+SERIES_BRACKET = re.compile(r"\[\s*([^\]\n]{2,60}?)\s*\]")
+# Everything a header carries that is not the book: the count, the pointer down
+# at the files, the channel's topic tags.
+SERIES_JUNK = re.compile(
+    r"[(\[][^)\]]*عدد\s+الدروس[^)\]]*[)\]]"  # ( عدد الدروس : 49 )
+    r"|عدد\s+الدروس\s*:?\s*\d*|#\S+|👇|\[[^\]]*\]"
+)
+# A file named nothing but its own number — the only numbering a bulk run has.
+# `31-2` is the second half of episode 31, so it reads as 31 and the run's two
+# rows both claim that episode, which is what they are. ponytail: 3 files in the
+# archive do this; make them one lesson of two parts if a run ever splits often.
+NUMERIC_FILENAME = re.compile(r"^0*(\d{1,4})(?:-\d{1,2})?$")
 
 
 def _log(message: str) -> None:
@@ -275,6 +302,112 @@ def filename_title(media: list[dict]) -> str | None:
     return None
 
 
+def episode_number(message: dict) -> int | None:
+    """The episode a bulk-run file numbers itself, from its filename. `01.MP3` → 1.
+
+    `filename_title` throws this name away and is right to — «01» is not a title.
+    It is a position, though, and inside a series run it is the channel's own
+    numbering, which survives a deleted message where counting from one does not.
+    """
+    for item in message["media"]:
+        name = (item.get("originalFileName") or "").translate(_FILENAME_JUNK)
+        hit = NUMERIC_FILENAME.match(_digits(re.sub(r"\.[A-Za-z0-9]{1,5}$", "", name)))
+        if hit is not None:
+            return int(hit.group(1))
+    return None
+
+
+def series_header(messages: list[dict], position: int) -> str | None:
+    """The series this text post opens, or None if it opens nothing.
+
+    Three tests, and every one of them was needed against the corpus. It has to
+    be a text post with no media of its own. It has to name a book — a bracketed
+    name or a declared lesson count — which is what keeps «الدروس بصيغة أخرى 👇»
+    (a re-upload announcement, 41 of them) and «تعليق على الجامع [ 173 ]» (an
+    episode number in brackets) from minting series of their own. And a run of at
+    least two files has to follow it, or a declared count of at least two, which
+    is the difference between a series header and an ordinary lesson title.
+    """
+    message = messages[position]
+    if message["mediaType"] != "none" or not (message["text"] or "").strip():
+        return None
+    text = _digits(message["text"])
+    count = SERIES_COUNT.search(text)
+    bracket = next(
+        (
+            name
+            for name in SERIES_BRACKET.findall(text)
+            if re.search(r"[ء-ي]", name) and "عدد" not in name
+        ),
+        None,
+    )
+    if count is None and bracket is None:
+        return None
+    declared = int(count.group(1)) if count and count.group(1) else 0
+    run = 0
+    for follower in messages[position + 1 :]:
+        if audio_media(follower):
+            run += 1
+            continue
+        # A group-call event carries neither text nor media; 635 of them sit in
+        # this channel and none of them ends a run.
+        if follower["mediaType"] == "none" and not (follower["text"] or "").strip():
+            continue
+        break
+    if run == 0 or max(run, declared) < SERIES_RUN_MIN:
+        return None
+    if bracket is not None:
+        return bracket
+    name = SERIES_JUNK.sub(" ", text.split("\n")[0])
+    return " ".join(name.split()).strip(" .:،-") or None
+
+
+# The same lesson, encoded twice. The channel uploads the recording and puts the
+# other format up minutes later — «الجامع 158 الرازيين 12.m4a», then the same
+# thing as `.mp3` — and M1 cannot deduplicate those, because the bytes differ.
+# Length to within two seconds is what survives a re-encode; the name is what
+# keeps length from lying. Five 2017 pairs are different episodes of one book
+# that happen to run the same length, and they are numbered files with no name
+# at all, so demanding a name is what excludes them.
+REPOST_DRIFT_MS = 2_000
+REPOST_NAME_MIN = 6
+# The other format goes up the same evening, so the pair is hours apart at most.
+# The window is not a nicety: «تتمة مهمة» is a caption this channel reuses 100
+# times over nine years, and without it 64 unrelated follow-up clips collide on
+# that name the moment two of them happen to run the same length.
+REPOST_WINDOW_S = 6 * 3600
+_NOT_NAME = re.compile(r"[^\u0621-\u064A0-9]+")
+
+
+def repost_name(message: dict) -> str:
+    """A lesson's name reduced to what survives a re-encode.
+
+    Letters and digits, no spaces. «الجامع 262 البربهاري 1» comes back with its
+    numbers bracketed and written in the other digit alphabet, «عمدة الفقه 169
+    كتاب القضاء» comes back with the tail cut off, and neither is a difference
+    `normalize` plus this stripping cannot erase.
+    """
+    name = filename_title(audio_media(message)) or (message["text"] or "")
+    return _NOT_NAME.sub("", normalize(name))
+
+
+def reencoded(message: dict, composed: list[tuple[str, int, int]]) -> bool:
+    """Is this message a composed lesson uploaded again in another format?"""
+    media = live_media(message)
+    if len(media) != 1:  # a multi-file message is a composition, not a re-upload
+        return False
+    name = repost_name(message)
+    if len(name) < REPOST_NAME_MIN:
+        return False
+    duration = media[0]["durationMs"] or 0
+    return any(
+        message["date"] - date <= REPOST_WINDOW_S * 1000
+        and abs(duration - other_ms) <= REPOST_DRIFT_MS
+        and (name in other or other in name)
+        for other, other_ms, date in composed
+    )
+
+
 def bare_part(message: dict) -> bool:
     """A recording that carries nothing able to name it: caption, filename, both
     absent. Only such a part may join its run across a long pause — a part that
@@ -287,7 +420,7 @@ def bare_part(message: dict) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# Grouping v2
+# Grouping v3
 # --------------------------------------------------------------------------- #
 
 
@@ -309,14 +442,37 @@ def group(messages: list[dict]) -> list[dict]:
     Nothing else about a lesson's identity moved, so a run that v1 cut in two
     now composes under the key of its first half and the second half's row is
     superseded — see `retire_superseded` for what happens to it.
+
+    v3 adds the two things the 2017 archive needs and nothing else: a series
+    header names the run behind it (`series_header`), and a message that re-posts
+    a binary an earlier message already carried composes nothing, because the
+    same recording is not two lessons.
     """
     lessons: list[dict] = []
     by_id = {message["telegramMessageId"]: message for message in messages}
     of_message: dict[int, int] = {}  # telegramMessageId -> index in `lessons`
+    header: str | None = None  # the series a run of files belongs to
+    run = 0  # lessons composed under it, for a file that numbers itself nowhere
+    posted: set[str] = set()  # every binary already composed, by sha256
+    composed: list[tuple[str, int, int]] = []  # (name, length, date), for re-encodes
 
     for position, message in enumerate(messages):
         media = audio_media(message)
-        if not media or message["deletedAt"] is not None:
+        if not media:
+            # A text post closes the run behind it, and may open the next one.
+            if (message["text"] or "").strip():
+                header, run = series_header(messages, position), 0
+            continue
+        if message["deletedAt"] is not None:
+            continue
+        # The same file, posted twice. 186 messages in @doros_alkulify do this —
+        # a live stream's recording goes up, and the studio copy follows minutes
+        # later under a machine name (`4_5906797496…m4a`). M1 deduplicated the
+        # bytes, so the repost is provably the same recording, not a second one.
+        live = [item["sha256"] for item in live_media(message)]
+        if live and all(sha in posted for sha in live):
+            continue
+        if reencoded(message, composed):
             continue
         # §Phase 3: forwarded audio is not the sheikh's own recording of this
         # lesson. 642 of @alkulife's forwards are its own reposts, which would
@@ -352,6 +508,18 @@ def group(messages: list[dict]) -> list[dict]:
             if contiguous and short and gap <= limit:
                 joined = len(lessons) - 1
 
+        posted.update(live)
+        name = repost_name(message)
+        if len(live) == 1 and len(name) >= REPOST_NAME_MIN:
+            composed = [
+                row
+                for row in composed
+                if message["date"] - row[2] <= REPOST_WINDOW_S * 1000
+            ]
+            composed.append(
+                (name, live_media(message)[0]["durationMs"] or 0, message["date"])
+            )
+
         if joined is not None:
             lesson = lessons[joined]
             lesson["parts"].append(message)
@@ -363,6 +531,7 @@ def group(messages: list[dict]) -> list[dict]:
             of_message[message["telegramMessageId"]] = joined
             continue
 
+        run += 1
         title = None
         if (
             previous is not None
@@ -374,6 +543,11 @@ def group(messages: list[dict]) -> list[dict]:
             {
                 "title": title,
                 "parts": [message],
+                "series": header,
+                # The file's own number first: a run whose third message was
+                # deleted still calls its fourth file 04.MP3, and counting from
+                # one would renumber the whole book from there.
+                "episode": episode_number(message) or run,
                 "groupedId": message["groupedId"],
                 "lastDate": message["date"],
                 "lastMessageId": message["telegramMessageId"],
@@ -411,6 +585,12 @@ def title_of(lesson: dict) -> tuple[str, str, float]:
         caption = (part["text"] or "").strip()
         if caption:
             return caption.split("\n")[0][:TITLE_MAX_CHARS], "caption", 0.5
+    # Nothing on the lesson names it — but the post that opened its run does, and
+    # the file numbers itself inside that run. «شرح علل الترمذي (4)» is written
+    # in the shape `parse_title` already reads, so the series name and the
+    # episode number come back out of it with no new plumbing.
+    if lesson["series"] is not None:
+        return f"{lesson['series']} ({lesson['episode']})", "series_header", 0.7
     # No title anywhere. An empty string rather than a stand-in: a URL or a date
     # put here would reach the search index as this lesson's title and read like
     # one. The review queue is where it gets a name.
@@ -620,6 +800,14 @@ def organize(
                 counts.processed += 1
                 title_text, title_source, confidence = title_of(candidate)
                 parsed = parse_title(title_text)
+                if title_source == "series_header":
+                    # The header and the filename said both outright. Reading our
+                    # own sentence back would let `FROM_SOURCE` cut «الأصول من علم
+                    # الأصول» in half and file thirteen lessons under «علم الأصول».
+                    parsed |= {
+                        "seriesName": candidate["series"],
+                        "seriesEpisode": candidate["episode"],
+                    }
                 title_message = candidate["title"]
                 first = candidate["parts"][0]
                 key = lesson_key(

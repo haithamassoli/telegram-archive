@@ -477,6 +477,111 @@ def test_two_whole_sittings_in_a_row_stay_two_lessons():
     assert len(lessons) == 2, "45 minutes each is a sitting, not a part"
 
 
+def test_a_series_header_names_the_whole_run_behind_it():
+    """2017's back catalogue: one post names the book, the files are 01, 02, 03."""
+    world = World()
+    world.message("شرح كتاب [ الصمت ] لابن أبي الدنيا ( عدد الدروس : 3 ) 👇")
+    for index, name in enumerate("abc", start=1):
+        world.message(audio=[(name * 64, 2_600_000, f"{index:02d}.MP3")])
+    lessons = _grouped(world)
+    assert len(lessons) == 3
+    titles = [organize.title_of(lesson) for lesson in lessons]
+    assert [t[1] for t in titles] == ["series_header"] * 3
+    assert [t[0] for t in titles] == ["الصمت (1)", "الصمت (2)", "الصمت (3)"]
+    # The synthesized title is written in the shape the parser already reads.
+    assert organize.parse_title(titles[2][0])["seriesEpisode"] == 3
+
+
+def test_a_deleted_episode_does_not_renumber_the_rest_of_the_book():
+    world = World()
+    world.message("شرح كتاب [ الصمت ] ( عدد الدروس : 3 ) 👇")
+    world.message(audio=[("a" * 64, 2_600_000, "01.MP3")])
+    world.message(audio=[("c" * 64, 2_600_000, "03.MP3")])  # 02 deleted upstream
+    assert [organize.title_of(x)[0] for x in _grouped(world)] == [
+        "الصمت (1)",
+        "الصمت (3)",
+    ]
+
+
+def test_a_re_upload_announcement_does_not_mint_a_series():
+    """«الدروس بصيغة أخرى 👇» opens 41 runs and names no book. Nor does an
+    episode number in brackets: «تعليق على الجامع [ ١٧٣ ]» is one lesson."""
+    for header in ("الدروس بصيغة أخرى 👇", "تعليق على الجامع [ ١٧٣ ]"):
+        world = World()
+        world.message(header)
+        for name in "ab":
+            world.message(audio=[(name * 64, 2_600_000)])
+        assert organize.series_header(world.convex.messages, 0) is None, header
+
+
+def test_a_series_header_needs_a_run_behind_it_not_just_a_name():
+    world = World()
+    world.message("شرح كتاب [ الصمت ] لابن أبي الدنيا 👇")
+    world.message(audio=[("a" * 64, 2_600_000, "الصمت الأول.m4a")])
+    world.message("نص آخر")
+    assert organize.series_header(world.convex.messages, 0) is None
+
+
+def test_the_same_file_posted_twice_is_one_lesson():
+    """A live stream's recording goes up, the studio copy follows under a
+    machine name minutes later. M1 deduplicated the bytes, so it is provable."""
+    world = World()
+    first = world.message(audio=[("a" * 64, 1_575_147, "الجامع 230 صريح السنة 3.m4a")])
+    world.message(
+        audio=[("a" * 64, 1_575_147, "4_5906797496314631763.m4a")],
+        date=first["date"] + 20 * 60_000,
+    )
+    lessons = _grouped(world)
+    assert len(lessons) == 1, "the same recording is not two lessons"
+    assert organize.title_of(lessons[0])[0] == "الجامع 230 صريح السنة 3"
+
+
+def test_the_same_lesson_in_another_format_is_one_lesson():
+    """The `.m4a` goes up, the `.mp3` follows the same evening: reformatted,
+    re-bracketed, in the other digit alphabet, same length to the millisecond."""
+    world = World()
+    first = world.message(audio=[("a" * 64, 2_345_003, "الجامع 262 البربهاري 1.m4a")])
+    world.message(
+        audio=[("b" * 64, 2_345_003, "الجامع [٢٦٢] البربهاري [ ١ ].mp3")],
+        date=first["date"] + 6 * 60_000,
+    )
+    lessons = _grouped(world)
+    assert len(lessons) == 1, "two encodings of one recording are one lesson"
+    assert organize.title_of(lessons[0])[0] == "الجامع 262 البربهاري 1"
+
+
+def test_a_reused_caption_does_not_merge_two_unrelated_clips():
+    """«تتمة مهمة» names 100 follow-up clips over nine years. Two of them running
+    the same length are still two lessons — the window is what says so."""
+    world = World()
+    first = world.message(audio=[("a" * 64, 270_000, "تتمة مهمة.m4a")])
+    world.message(
+        audio=[("b" * 64, 270_000, "تتمة مهمة.m4a")],
+        date=first["date"] + (organize.REPOST_WINDOW_S + 60) * 1000,
+    )
+    assert len(_grouped(world)) == 2
+
+
+def test_a_numbered_file_is_never_merged_by_length_alone():
+    """2017: episodes 3 and 4 of one book, 3951 s and 3950 s. Nothing but the
+    number names them, so nothing may merge them."""
+    world = World()
+    world.message("شرح كتاب [ السنة ] ( عدد الدروس : 2 ) 👇")
+    first = world.message(audio=[("a" * 64, 3_951_256, "03.MP3")])
+    world.message(
+        audio=[("b" * 64, 3_950_080, "04.MP3")], date=first["date"] + 3 * 60_000
+    )
+    assert len(_grouped(world)) == 2
+
+
+def test_a_repost_of_only_some_of_a_message_still_composes():
+    world = World()
+    world.message(audio=[("a" * 64, 1_500_000, "الجامع 1.m4a")])
+    world.message(audio=[("a" * 64, 1_500_000), ("b" * 64, 900_000, "الجامع 2.m4a")])
+    lessons = _grouped(world)
+    assert len(lessons) == 2, "a message carrying one new binary is not a repost"
+
+
 def test_a_pause_in_the_recording_does_not_rename_the_rest_of_the_run():
     """The bug v1 had: half a run sitting behind a 20-minute pause, untitled."""
     world = World()
