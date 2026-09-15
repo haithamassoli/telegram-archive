@@ -40,6 +40,9 @@ ARTICLE_MIN_CHARS = 500
 # articles would cut 145 articles in half.
 ARTICLE_CONTINUES_AT = 3_900
 ARTICLE_CONTINUATION_MIN = 200
+# A photo posted on its own this soon before an article's text is its picture.
+# ponytail: a fixed window; 46 articles follow a bare photo, the admin unlinks misses.
+ARTICLE_PHOTO_LEAD_MS = 10 * 60_000
 # A title message is short. 97.3% of title candidates are under 100 chars; 300
 # leaves room for @doros_alkulify's multi-line "series [ N ] / sub-series [ n ]"
 # headers without admitting prose.
@@ -635,6 +638,40 @@ def article_title(text: str) -> tuple[str, str]:
     return " ".join(text.split())[:80], "prefix"
 
 
+def article_photos(messages: list[dict], position: int) -> list[str]:
+    """mediaObjectIds of an article's photos: its own, its album's, and bare
+    photos posted right before it."""
+    message = messages[position]
+    album = message["groupedId"]
+
+    def belongs(other: dict, before: bool) -> bool:
+        if other["deletedAt"] is not None or other["mediaType"] != "photo":
+            return False
+        if album is not None and other["groupedId"] == album:
+            return True
+        return (
+            before
+            and not other["isForwarded"]
+            and not (other["text"] or "").strip()
+            and message["date"] - other["date"] <= ARTICLE_PHOTO_LEAD_MS
+        )
+
+    start = position
+    while start > 0 and belongs(messages[start - 1], True):
+        start -= 1
+    end = position
+    while end + 1 < len(messages) and belongs(messages[end + 1], False):
+        end += 1
+    ids: list[str] = []
+    for other in messages[start : end + 1]:
+        if other["mediaType"] != "photo":
+            continue
+        for media in other["media"]:
+            if media["deletedAt"] is None and media["mediaObjectId"] not in ids:
+                ids.append(media["mediaObjectId"])
+    return ids
+
+
 def articles_of(messages: list[dict]) -> list[dict]:
     """Article rows, with Telegram's 4,096-char cap stitched back together."""
     out: list[dict] = []
@@ -672,6 +709,7 @@ def articles_of(messages: list[dict]) -> list[dict]:
                 "normalizedText": normalize(text),
                 "date": message["date"],
                 "telegramUrl": message["telegramUrl"],
+                "photoIds": article_photos(messages, position),
             }
         )
     return out

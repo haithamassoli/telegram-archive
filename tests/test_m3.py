@@ -689,6 +689,27 @@ def test_a_truncated_article_is_stitched_back_to_its_continuation():
     assert articles[0]["titleSource"] == "first_line"
 
 
+def test_an_article_takes_its_own_photo_and_the_bare_one_before_it():
+    world = World()
+    text = "عنوان\n\n" + ("كلام. " * 120)
+    world.message("درس قديم")  # captioned: not the article's picture
+    world.message(None)  # bare photo, a minute before the text
+    world.message(text)
+    world.message(None, groupedId="g")  # a later album is someone else's
+    messages = world.convex.messages
+    for number, message in enumerate(messages):
+        if number != 2:
+            message["mediaType"] = "photo"
+            message["media"] = [{"mediaObjectId": f"photo{number}", "deletedAt": None}]
+        message["semanticType"] = organize.classify(message, None)
+    [article] = organize.articles_of(messages)
+    assert article["photoIds"] == ["photo1"]
+
+    messages[2]["groupedId"] = "g"
+    [article] = organize.articles_of(messages)
+    assert article["photoIds"] == ["photo1", "photo3"], "an album is one post"
+
+
 # --------------------------------------------------------------------------- #
 # the stage
 # --------------------------------------------------------------------------- #
